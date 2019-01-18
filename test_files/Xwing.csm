@@ -1,0 +1,526 @@
+# xwing.csm written by ocsmSave (v1.09)
+
+# Constant Parameters:
+
+# Design Parameters:
+dimension scal   5   1   1
+despmtr   scal[1,:]   "     1.25000;"
+despmtr   scal[2,:]   "     1.00000;"
+despmtr   scal[3,:]   "     1.00000;"
+despmtr   scal[4,:]   "     1.50000;"
+despmtr   scal[5,:]   "     2.00000;"
+dimension zloc   5   1   1
+despmtr   zloc[1,:]   "    -0.50000;"
+despmtr   zloc[2,:]   "     0.00000;"
+despmtr   zloc[3,:]   "     5.00000;"
+despmtr   zloc[4,:]   "     9.00000;"
+despmtr   zloc[5,:]   "    15.00000;"
+
+# Global attributes:
+
+# Branches:
+mark
+patbeg    n   5
+   skbeg     -1.405   0   0   1
+      skvar     xy   -0.002821;0.008108;0.000000;0.523665;1.460484;0.000000;2.275593;1.460484;0.000000;2.802079;0.008108;0.000000;2.021427;-1.108406;0.000000;0.777831;-1.108406;0.000000;
+      skcon     X   1   -1  0
+      skcon     Y   1   -1  0
+      skcon     H   2   3  0
+      skcon     H   5   6  0
+      skcon     L   3   4  1.55
+      skcon     L   5   6  1.25
+      skcon     L   2   3  1.75
+      skcon     D   4   1  0
+      skcon     L   1   2  1.55
+      skcon     A   4   -1  -55
+      skcon     A   1   -1  -55
+      skcon     A   2   -1  -70
+      linseg    ::x[2]   ::y[2]   0
+      linseg    ::x[3]   ::y[3]   0
+      linseg    ::x[4]   ::y[4]   0
+      linseg    ::x[5]   ::y[5]   0
+      linseg    ::x[6]   ::y[6]   0
+      linseg    ::x[1]   ::y[1]   0
+   skend     0
+   scale     1/scal[n]
+   translate 0   0   zloc[n]
+patend
+skbeg     -.5   0   16.75   1
+   skvar     xy   -0.001178;0.001034;0.000000;0.000059;0.003507;0.000000;1.000279;0.003507;0.000000;1.001515;0.001034;0.000000;1.000279;-0.000202;0.000000;0.000059;-0.000202;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   2   3  0
+   skcon     H   5   6  0
+   skcon     L   2   3  1.0
+   skcon     A   5   -1  -35
+   skcon     L   4   5  .002
+   skcon     L   3   4  .002
+   skcon     L   1   2  .002
+   skcon     L   6   1  .002
+   skcon     P   1   -1  0
+   skcon     P   4   -1  0
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[6]   ::y[6]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+rule      0
+attribute _color  100;100;87
+skbeg     0   0   -.05   1
+   skvar     xy   0.000000;0.000000;0.000000;-8.008475;0.000000;0.000000;-8.008475;-2.500000;0.000000;0.000000;-5.000000;0.000000;7.987288;-2.500000;0.000000;7.987288;0.000000;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   1   2  0
+   skcon     V   2   3  0
+   skcon     V   5   6  0
+   skcon     H   6   1  0
+   skcon     L   1   2  8
+   skcon     L   6   1  8
+   skcon     L   5   6  2.5
+   skcon     L   2   3  2.5
+   skcon     D   1   4  -5
+   skcon     L   4   5  ::L[3]
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[6]   ::y[6]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+extrude   0   0   .1
+attribute _color  100;100;87
+rotatex   -90   0   0
+rotatez   -20   0   0
+skbeg     0   0   -.05   1
+   skvar     xy   -0.010594;0.004885;0.000000;-8.018337;0.004885;0.000000;-8.018337;-2.500000;0.000000;-0.010594;-4.985162;0.000000;7.997150;-2.500000;0.000000;7.997150;0.004885;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   1   2  0
+   skcon     V   2   3  0
+   skcon     V   5   6  0
+   skcon     H   6   1  0
+   skcon     L   1   2  8
+   skcon     L   6   1  8
+   skcon     L   5   6  2.5
+   skcon     L   2   3  2.5
+   skcon     D   1   4  -5
+   skcon     L   4   5  ::L[3]
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[6]   ::y[6]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+extrude   0   0   .1
+attribute _color  100;100;87
+rotatex   -90   0   0
+rotatez   20   0   0
+cylinder  1.65   1.25   1.0   1.65   1.25   5   .65
+attribute _color  100;100;87
+cylinder  -1.65   1.25   1.0   -1.65   1.25   5   .65
+attribute _color  100;100;87
+cylinder  1.50   -1.20   1.0   1.50   -1.20   5   .65
+attribute _color  100;100;87
+cylinder  -1.50   -1.20   1.0   -1.50   -1.20   5   .65
+attribute _color  100;100;87
+cylinder  1.65   1.5   -1.0   1.65   1.5   1.0   .45
+attribute _color  100;100;87
+cylinder  -1.65   1.5   -1.0   -1.65   1.5   1.0   .45
+attribute _color  100;100;87
+cylinder  1.50   -1.4   -1.0   1.50   -1.4   1.0   .45
+attribute _color  100;100;87
+cylinder  -1.50   -1.4   -1.0   -1.50   -1.4   1.0   .45
+attribute _color  100;100;87
+cylinder  7.504   2.9   0   7.504   2.9   2.5   .2
+attribute _color  100;100;87
+cylinder  -7.504   2.9   0   -7.504   2.9   2.5   .2
+attribute _color  100;100;87
+cylinder  7.504   -2.9   0   7.504   -2.9   2.5   .2
+attribute _color  100;100;87
+cylinder  -7.504   -2.9   0   -7.504   -2.9   2.5   .2
+attribute _color  100;100;87
+cylinder  7.504   2.9   0   7.504   2.9   9.5   .1
+attribute _color  100;100;87
+cylinder  -7.504   2.9   0   -7.504   2.9   9.5   .1
+attribute _color  100;100;87
+cylinder  7.504   -2.9   0   7.504   -2.9   9.5   .1
+attribute _color  100;100;87
+cylinder  -7.504   -2.9   0   -7.504   -2.9   9.5   .1
+attribute _color  100;100;87
+sphere    0   1.5   4.6   .35
+attribute _color  0;0;240
+cylinder  0   1   4.6   0   1.5   4.6   .35
+attribute _color  255;255;255
+skbeg     0   0   0   1
+   skvar     xy   -0.002158;0.004007;0.000000;3.497842;0.004007;0.000000;3.497842;0.103268;0.000000;2.496609;0.401048;0.000000;-0.002158;0.401048;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   1   2  0
+   skcon     V   2   3  0
+   skcon     H   4   5  0
+   skcon     V   5   1  0
+   skcon     L   2   3  .1
+   skcon     L   5   1  .4
+   skcon     L   1   2  3.5
+   skcon     L   4   5  2.5
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+extrude   0   0   3.5
+attribute _color  100;100;87
+rotatez   20   0   0
+skbeg     0   0   0   1
+   skvar     xy   -0.002158;0.004007;0.000000;3.497842;0.004007;0.000000;3.497842;0.103268;0.000000;2.496609;0.401048;0.000000;-0.002158;0.401048;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   1   2  0
+   skcon     V   2   3  0
+   skcon     H   4   5  0
+   skcon     V   5   1  0
+   skcon     L   2   3  .1
+   skcon     L   5   1  .4
+   skcon     L   1   2  3.5
+   skcon     L   4   5  2.5
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+extrude   0   0   3.5
+attribute _color  100;100;87
+rotatez   20   0   0
+mirror    1   0   0   0
+skbeg     0   0   0   1
+   skvar     xy   -0.002158;0.004007;0.000000;3.497842;0.004007;0.000000;3.497842;0.103268;0.000000;2.496609;0.401048;0.000000;-0.002158;0.401048;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   1   2  0
+   skcon     V   2   3  0
+   skcon     H   4   5  0
+   skcon     V   5   1  0
+   skcon     L   2   3  .1
+   skcon     L   5   1  .4
+   skcon     L   1   2  3.5
+   skcon     L   4   5  2.5
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+extrude   0   0   3.5
+attribute _color  100;100;87
+rotatez   20   0   0
+mirror    0   1   0   0
+skbeg     0   0   0   1
+   skvar     xy   -0.002158;0.004007;0.000000;3.497842;0.004007;0.000000;3.497842;0.103268;0.000000;2.496609;0.401048;0.000000;-0.002158;0.401048;0.000000;
+   skcon     X   1   -1  0
+   skcon     Y   1   -1  0
+   skcon     H   1   2  0
+   skcon     V   2   3  0
+   skcon     H   4   5  0
+   skcon     V   5   1  0
+   skcon     L   2   3  .1
+   skcon     L   5   1  .4
+   skcon     L   1   2  3.5
+   skcon     L   4   5  2.5
+   linseg    ::x[2]   ::y[2]   0
+   linseg    ::x[3]   ::y[3]   0
+   linseg    ::x[4]   ::y[4]   0
+   linseg    ::x[5]   ::y[5]   0
+   linseg    ::x[1]   ::y[1]   0
+skend     0
+extrude   0   0   3.5
+attribute _color  100;100;87
+mirror    1   0   0   0
+mirror    0   1   0   0
+rotatez   20   0   0
+
+#======================================#
+# automatically generated verification #
+# OpenCSM  1.13      OpenCASCADE 6.8.1 #
+#======================================#
+select    body 59
+   assert         3      @itype       0  1
+   assert        36      @nnode       0  1
+   assert        66      @nedge       0  1
+   assert        32      @nface       0  1
+   assert   5.85680e+01  @volume  -.001  1
+   assert   1.18420e+02  @area    -.001  1
+   assert   1.22923e-04  @xcg     0.001  1
+   assert   1.75206e-01  @ycg     -.001  1
+   assert   5.60296e+00  @zcg     -.001  1
+
+select    body 70
+   assert         3      @itype       0  1
+   assert        12      @nnode       0  1
+   assert        18      @nedge       0  1
+   assert         8      @nface       0  1
+   assert   6.00000e+00  @volume  -.001  1
+   assert   1.23776e+02  @area    -.001  1
+   assert   0.00000e+00  @xcg     0.001  1
+   assert   0.00000e+00  @ycg     0.001  1
+   assert   1.94444e+00  @zcg     -.001  1
+
+select    body 81
+   assert         3      @itype       0  1
+   assert        12      @nnode       0  1
+   assert        18      @nedge       0  1
+   assert         8      @nface       0  1
+   assert   6.00000e+00  @volume  -.001  1
+   assert   1.23776e+02  @area    -.001  1
+   assert   0.00000e+00  @xcg     0.001  1
+   assert   0.00000e+00  @ycg     0.001  1
+   assert   1.94444e+00  @zcg     -.001  1
+
+select    body 82
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   5.30929e+00  @volume  -.001  1
+   assert   1.89909e+01  @area    -.001  1
+   assert   1.65000e+00  @xcg     -.001  1
+   assert   1.25000e+00  @ycg     -.001  1
+   assert   3.00000e+00  @zcg     -.001  1
+
+select    body 83
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   5.30929e+00  @volume  -.001  1
+   assert   1.89909e+01  @area    -.001  1
+   assert  -1.65000e+00  @xcg     -.001  1
+   assert   1.25000e+00  @ycg     -.001  1
+   assert   3.00000e+00  @zcg     -.001  1
+
+select    body 84
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   5.30929e+00  @volume  -.001  1
+   assert   1.89909e+01  @area    -.001  1
+   assert   1.50000e+00  @xcg     -.001  1
+   assert  -1.20000e+00  @ycg     -.001  1
+   assert   3.00000e+00  @zcg     -.001  1
+
+select    body 85
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   5.30929e+00  @volume  -.001  1
+   assert   1.89909e+01  @area    -.001  1
+   assert  -1.50000e+00  @xcg     -.001  1
+   assert  -1.20000e+00  @ycg     -.001  1
+   assert   3.00000e+00  @zcg     -.001  1
+
+select    body 86
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   1.27235e+00  @volume  -.001  1
+   assert   6.92721e+00  @area    -.001  1
+   assert   1.65000e+00  @xcg     -.001  1
+   assert   1.50000e+00  @ycg     -.001  1
+   assert   0.00000e+00  @zcg     0.001  1
+
+select    body 87
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   1.27235e+00  @volume  -.001  1
+   assert   6.92721e+00  @area    -.001  1
+   assert  -1.65000e+00  @xcg     -.001  1
+   assert   1.50000e+00  @ycg     -.001  1
+   assert   0.00000e+00  @zcg     0.001  1
+
+select    body 88
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   1.27235e+00  @volume  -.001  1
+   assert   6.92721e+00  @area    -.001  1
+   assert   1.50000e+00  @xcg     -.001  1
+   assert  -1.40000e+00  @ycg     -.001  1
+   assert   0.00000e+00  @zcg     0.001  1
+
+select    body 89
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   1.27235e+00  @volume  -.001  1
+   assert   6.92721e+00  @area    -.001  1
+   assert  -1.50000e+00  @xcg     -.001  1
+   assert  -1.40000e+00  @ycg     -.001  1
+   assert   0.00000e+00  @zcg     0.001  1
+
+select    body 90
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   3.14159e-01  @volume  -.001  1
+   assert   3.39292e+00  @area    -.001  1
+   assert   7.50400e+00  @xcg     -.001  1
+   assert   2.90000e+00  @ycg     -.001  1
+   assert   1.25000e+00  @zcg     -.001  1
+
+select    body 91
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   3.14159e-01  @volume  -.001  1
+   assert   3.39292e+00  @area    -.001  1
+   assert  -7.50400e+00  @xcg     -.001  1
+   assert   2.90000e+00  @ycg     -.001  1
+   assert   1.25000e+00  @zcg     -.001  1
+
+select    body 92
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   3.14159e-01  @volume  -.001  1
+   assert   3.39292e+00  @area    -.001  1
+   assert   7.50400e+00  @xcg     -.001  1
+   assert  -2.90000e+00  @ycg     -.001  1
+   assert   1.25000e+00  @zcg     -.001  1
+
+select    body 93
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   3.14159e-01  @volume  -.001  1
+   assert   3.39292e+00  @area    -.001  1
+   assert  -7.50400e+00  @xcg     -.001  1
+   assert  -2.90000e+00  @ycg     -.001  1
+   assert   1.25000e+00  @zcg     -.001  1
+
+select    body 94
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   2.98451e-01  @volume  -.001  1
+   assert   6.03186e+00  @area    -.001  1
+   assert   7.50400e+00  @xcg     -.001  1
+   assert   2.90000e+00  @ycg     -.001  1
+   assert   4.75000e+00  @zcg     -.001  1
+
+select    body 95
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   2.98451e-01  @volume  -.001  1
+   assert   6.03186e+00  @area    -.001  1
+   assert  -7.50400e+00  @xcg     -.001  1
+   assert   2.90000e+00  @ycg     -.001  1
+   assert   4.75000e+00  @zcg     -.001  1
+
+select    body 96
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   2.98451e-01  @volume  -.001  1
+   assert   6.03186e+00  @area    -.001  1
+   assert   7.50400e+00  @xcg     -.001  1
+   assert  -2.90000e+00  @ycg     -.001  1
+   assert   4.75000e+00  @zcg     -.001  1
+
+select    body 97
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   2.98451e-01  @volume  -.001  1
+   assert   6.03186e+00  @area    -.001  1
+   assert  -7.50400e+00  @xcg     -.001  1
+   assert  -2.90000e+00  @ycg     -.001  1
+   assert   4.75000e+00  @zcg     -.001  1
+
+select    body 98
+   assert         3      @itype       0  1
+   assert         2      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         2      @nface       0  1
+   assert   1.79594e-01  @volume  -.001  1
+   assert   1.53937e+00  @area    -.001  1
+   assert   0.00000e+00  @xcg     0.001  1
+   assert   1.50000e+00  @ycg     -.001  1
+   assert   4.60000e+00  @zcg     -.001  1
+
+select    body 99
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         6      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   1.92423e-01  @volume  -.001  1
+   assert   1.86925e+00  @area    -.001  1
+   assert   0.00000e+00  @xcg     0.001  1
+   assert   1.25000e+00  @ycg     -.001  1
+   assert   4.60000e+00  @zcg     -.001  1
+
+select    body 108
+   assert         3      @itype       0  1
+   assert        10      @nnode       0  1
+   assert        15      @nedge       0  1
+   assert         7      @nface       0  1
+   assert   4.37500e+00  @volume  -.001  1
+   assert   2.89041e+01  @area    -.001  1
+   assert   1.42041e+00  @xcg     -.001  1
+   assert   7.17054e-01  @ycg     -.001  1
+   assert   1.75000e+00  @zcg     -.001  1
+
+select    body 118
+   assert         3      @itype       0  1
+   assert        10      @nnode       0  1
+   assert        15      @nedge       0  1
+   assert         7      @nface       0  1
+   assert   4.37500e+00  @volume  -.001  1
+   assert   2.89041e+01  @area    -.001  1
+   assert  -1.42041e+00  @xcg     -.001  1
+   assert   7.17054e-01  @ycg     -.001  1
+   assert   1.75000e+00  @zcg     -.001  1
+
+select    body 128
+   assert         3      @itype       0  1
+   assert        10      @nnode       0  1
+   assert        15      @nedge       0  1
+   assert         7      @nface       0  1
+   assert   4.37500e+00  @volume  -.001  1
+   assert   2.89041e+01  @area    -.001  1
+   assert   1.42041e+00  @xcg     -.001  1
+   assert  -7.17054e-01  @ycg     -.001  1
+   assert   1.75000e+00  @zcg     -.001  1
+
+select    body 139
+   assert         3      @itype       0  1
+   assert        10      @nnode       0  1
+   assert        15      @nedge       0  1
+   assert         7      @nface       0  1
+   assert   4.37500e+00  @volume  -.001  1
+   assert   2.89041e+01  @area    -.001  1
+   assert  -1.42041e+00  @xcg     -.001  1
+   assert  -7.17054e-01  @ycg     -.001  1
+   assert   1.75000e+00  @zcg     -.001  1
+
+dump xWing.egads
+end

@@ -1,0 +1,9 @@
+# spheres
+# written by John Dannenhoffer
+
+sphere          0.00      0.00      0.00      1.00
+
+
+dump spheres.egads
+
+end

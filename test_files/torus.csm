@@ -1,0 +1,48 @@
+# torus
+# written by John Dannenhoffer
+
+despmtr   xcent     0.00
+despmtr   ycent     0.00
+despmtr   zcent     0.00
+despmtr   dxaxis    0.00
+despmtr   dyaxis    0.00
+despmtr   dzaxis    2.00
+despmtr   Rmajor    2.
+despmtr   Rminor    1.0
+
+#torus     xcent     ycent     zcent \
+ #         dxaxis    dyaxis    dzaxis    Rmajor    Rminor
+
+
+cylinder xcent ycent zcent dxaxis dyaxis dzaxis Rminor
+
+
+# cut box
+     skbeg   -1 -1 0
+     linseg   0 -1 0
+     linseg   0  0 0
+     linseg  -1  0 0
+     linseg  -1 -1 0
+skend
+
+extrude         0 0 0.5
+
+intersect 
+dump halCylinder.egads
+end
+#======================================#
+# automatically generated verification #
+# OpenCSM  1.13      OpenCASCADE 6.8.1 #
+#======================================#
+select    body 1
+   assert         3      @itype       0  1
+   assert         4      @nnode       0  1
+   assert         8      @nedge       0  1
+   assert         4      @nface       0  1
+   assert   1.97392e-01  @volume  -.001  1
+   assert   3.94784e+00  @area    -.001  1
+   assert   0.00000e+00  @xcg     0.001  1
+   assert   0.00000e+00  @ycg     0.001  1
+   assert   0.00000e+00  @zcg     0.001  1
+dump torus.egads
+end
