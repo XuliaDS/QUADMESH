@@ -22,8 +22,8 @@
 #include "egads.h"
 
 #define PI            3.1415926535897931159979635
-#define MINVALIDANGLE 0.0//0.0872664625997165   // 5 degrees
-#define MAXVALIDANGLE 3.1415926535897931159979635//3.05432619099008     // 175 degrees
+#define MINVALIDANGLE 0.0
+#define MAXVALIDANGLE 3.66519142918809//3.31612557878923 // 190 degrees
 static int MESHPLOTS = 0;
 #define ISVERTEX 0
 #define ISQUAD   1
@@ -188,6 +188,7 @@ static int  EG_allocMeshData ( meshData **mesh, int nQ, int nV ) {
 }
 
 /* IO FUNCTIONS */
+static int EG_normalToSurface (meshMap *qm, double uv, double *normal ) ;
 static void printStar               (vStar *star) ;
 //static void printStarFile(vStar *star, meshMap *qm) ;
 static void printMeshStats(meshMap *qm, int sweep);
@@ -247,6 +248,8 @@ static int  getValence                (meshData *qm, int v );
 static int  validSwap                 (meshData *qm, int v1, int v2 );
 static int  validCollapse             (meshData *qm, int qID, int v );
 /*********************/
+
+
 
 static int
 EG_segment ( meshMap *qm, int id1, int id2, int datatype, double *segment  ) {
@@ -1248,8 +1251,8 @@ static int EG_createMeshMap(bodyData *bodydata)
 	  //  snprintf(buffer,500,"face_%d_np_%d", f+1, j + 1);
 	  //G  sampleNormalPlane( bodydata->qm[f] ,buffer,j + 1);
 	  fprintf(fill, "%lf %lf %lf %d\n", xyzs[3 * j ], xyzs[3 * j +1], xyzs[3 * j +2], j + 1);
-	  angle  = EG_angleAtBoundaryVertex (bodydata -> qm[f], j + 1);
-	  if ( angle < 0 ) return EGADS_GEOMERR;
+	  stat = EG_angleAtBoundaryVertex (bodydata -> qm[f], j + 1, e4, angle);
+	  if ( stat != EGADS_SUCCESS || angle < EPS11 ) return EGADS_GEOMERR;
 	  else if ( angle < 0.75 * PI ) {
 	      if ( bodydata->qm[f] -> mesh ->vType[j] > 0 ) {
 		  printf(" Node %d is now consider edge so that its regular valence is 3 \n", j + 1);
@@ -1651,17 +1654,35 @@ static void printQuadCoords (meshMap *qm, int qID ) {
 }
 
 
+static int EG_normalToSurface (meshMap *qm, double uv, double *normal ) {
+  int stat;
+  double eval[18];
+  stat = EG_evaluate(qm -> face, uv, eval);
+  if ( stat != EGADS_SUCCESS) {
+      printf(" EG_normalToSurface EG_evaluate at %lf %lf --> %d!!\n", uv[0], uv[1], stat);
+      return stat;
+  }
+  //
+  if ( qm -> face -> mtype == SREVERSE )
+    cross_product(&eval[6], &eval[3], normal);
+  else
+    cross_product(&eval[3], &eval[6], normal);
+  return EGADS_SUCCESS;
+}
+
 
 
 static int checkInvalidElement(meshMap *qm, int vID, double minAngle, double maxAngle ) {
-  int    q, j, k, qid, aux2, val, stat, area, it = 0, itMAX = 20, aux;
-  int piv[4] = { 0,1,2,3};
-  double angles[4], cross[4];
+  int    q, j, k, qid, aux2, val, stat, area, it = 0, itMAX = 20, aux, l0, l1, l2, v[4], bds[5], links[2] ;
+  int piv[4] = {0,1,2,3};
+  double angles[4], cross[4], eval[18], uv[2], angle, proj[3*2], vec1[4], vec2[4], tAB[2], tAC[2], tn[2], normal[3], cross[3], arc, totarc;
   vStar *star = NULL;
   stat        = EG_buildStar (qm ->mesh, &star, vID);
   if ( stat  != EGADS_SUCCESS || star == NULL ) return stat;
   printf(" -----------   CheckInvalid for vertex %d ------------\n", vID );
   for ( q = 0; q < star -> nQ; q++ ) {
+      for ( j = 0; j < 4; j++ )
+	v[j] =  qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + j ] - 1;
       printf(" check quad %d \n ", star -> quads[q] );
       stat = quadAlgebraicArea(qm, minAngle, maxAngle, star -> quads[q], &area, angles, cross);
       if ( stat != EGADS_SUCCESS ) {
@@ -1670,41 +1691,116 @@ static int checkInvalidElement(meshMap *qm, int vID, double minAngle, double max
 	  return stat;
       }
       if ( area == 1 ) continue;
-      it = 0;
       printf("\n Quad %d is in trouble \n \n", star -> quads[q]);
-      while ( it < itMAX ) {
-	  qid = EG_quadVertIdx ( qm -> mesh, star ->quads[q], vID);
-	  for  ( k = 0; k < 3; k++) {
-	      for  ( j = k + 1; j < 4; j++) {
-		  if ( angles[ piv [j] ] * cross[piv[j]] < angles[ piv[k ] ] * cross[ piv[k]]) {
-		      aux    = piv[j];
-		      piv[j] = piv[k];
-		      piv[k] = aux;
+      for  ( k = 0; k < 3; k++) {
+	  for  ( j = k + 1; j < 4; j++) {
+	      if ( angles[ piv [j] ] * cross[piv[j]] < angles[ piv[k ] ] * cross[ piv[k]] ) {
+		  aux    = piv[j];
+		  piv[j] = piv[k];
+		  piv[k] = aux;
+	      }
+	  }
+      }
+      for ( bds[0] = j = 0 ; j < 4; j++ ) {
+	  if ( qm -> mesh -> vType [ v[piv[j] ]] != -1 ) bds[++bds[0]] = piv[j];
+      }
+      if ( bds[1] == 2 ) {
+	  for ( k = 1; k <=2; k++ ) {
+	      stat = EG_angleAtBoundaryVertex (bodydata -> qm, v [ bds[k]] + 1, links, angle);
+	      for ( j = 0 ; j < 2; j++ ) {
+		  tAB[j] = qm ->mesh -> uvs [ 2 * ( links[0] - 1) + j] -
+		      qm ->     mesh -> uvs [ 2 *     v [ bds[k]] + j];
+		  tAC[j] = qm ->mesh -> uvs [ 2 * ( links[1] - 1) + j] -
+		      qm ->     mesh -> uvs [ 2 *     v [ bds[k]] + j];
+	      }
+	      if ( angle < PI * 0.9 || angle > PI * 1.1 ) {
+		  for ( j = 0 ; j < 2; j++ )
+		    tn[j] = tAB[j] + tAC[j];
+	      } else{
+		  tn[0] = -tAB[1];
+		  tn[1] =  tAB[0];
+	      }
+	      stat = EG_evaluate ( qm -> face, tn, eval);
+	      if ( stat != EGADS_SUCCESS) {
+		  tn[0] *= -1.0;
+		  tn[1] *= -1.0;
+		  stat = EG_evaluate ( qm -> face, tn, eval);
+		  if ( stat != EGADS_SUCCESS ) {
+		      printf("In checkInvalid:: I can't evaluate normal forward//backward!\n");
+		      return stat;
 		  }
 	      }
-	  }
-	  for ( j = 0 ; j < 4; j++ ) {
-	      aux  = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1 ) + piv[j] ] ;
-	      printf(" FIRST VERT %d \n", aux );
-	      printVertexCoords (qm, aux );
-	      stat = EG_averageCoords(qm, aux);
-	      printVertexCoords (qm, aux );
-	      for ( k = 0 ; k < qm -> mesh -> valence[ aux - 1][0]; k++ ) {
-		  aux2 =  qm -> mesh -> valence[ aux - 1][2 + k];
-		  printVertexCoords (qm, aux2 );
-		  if ( qm -> mesh -> vType[ aux2 -1 ] == -1 ) stat = EG_averageCoords(qm, aux2);
-		  printVertexCoords (qm, aux2 );
-	      }
-	      if ( stat != EGADS_SUCCESS) {
-		  printf(" Stat EG_averageCoords %d\n ", stat );
+	      stat = EG_normalToSurface ( qm, &qm -> mesh -> uvs [ 2 * v [ bds[k]] ], normal);
+	      if ( stat != EGADS_SUCCESS ) {
+		  printf("EG_checkInvalidElement: EG_normalToSurface at %d --> %d!!\n", v[bds[k]] + 1, stat);
 		  return stat;
 	      }
-	      printQuadCoords (qm , star -> quads[q]);
-	      printf(" area = %d !! \n ", area );
+	      stat  = EG_projectToTangentPlane(normal, &qm -> mesh -> xyzs [ 3 * v[bds[k]]], &qm -> mesh -> xyzs [ 3 * (links[0] -1 )],  proj);
+	      stat += EG_projectToTangentPlane(normal, &qm -> mesh -> xyzs [ 3 * v[bds[k]]], eval, &proj[3]);
+
+	      if ( stat != EGADS_SUCCESS ) {
+		  printf("EG_checkInvalidElement: EG_projectToTangentPlane %d, %d --> %d!!\n", v[bds[k]] + 1,links[0] + 1, stat);
+		  return stat;
+	      }
+	      for ( j = 0 ; j < 3; j++ ) {
+		  vec1[j] = proj[    j] - qm -> mesh -> xyzs [ 3 * v[bds[k]]];
+		  vec2[j] = proj[3 + j] - qm -> mesh -> xyzs [ 3 * v[bds[k]]];
+	      }
+	      unitVector    (&vec1[0], &vec1[3] );
+	      unitVector    (&vec2[0], &vec2[3] );
+	      cross_product (vec1, vec2, cross);
+	      if ( dotProduct (normal, cross ) < 0 ) {
+		  tn[0] *= -1;
+		  tn[1] *= -1;
+	      }
+	      tn[0] = qm -> mesh -> uvs [ 2 * v [ bds[k]]    ] + 0.25 * tn[0];
+	      tn[1] = qm -> mesh -> uvs [ 2 * v [ bds[k]] + 1] + 0.25 * tn[1];
+	      aux   = v [ (bds[1] + 1) % 4];
+	      if ( qm -> mesh ->vType[aux] != -1 )
+		aux   = v [ (bds[1] + 3) % 4];
+	      stat = EG_evaluate ( qm, tn, eval);
+	      if ( stat != EGADS_SUCCESS ) {
+		  printf("In checkInvalid:: I can't evaluate at new position %d!!\n", stat);
+		  return stat;
+	      }
+	      for ( j = 0; j < 3; j++ ) {
+		  if ( j < 2 )
+		    qm -> mesh -> uvs[ 2 * aux + j] = t[j];
+		  qm -> mesh -> xyzs[ 3 * aux + j] = eval[j];
+	      }
 	  }
-	  ++it;
-	  if ( area == 1 ) break;
+	  continue;
       }
+      else if ( bds[0] == 3 ) {
+	  for ( j = 0 ; j < 4; j++ )
+	    if ( qm -> mesh -> vType [ v[j] ] == -1 ) break;
+	  l0 = v[j];
+	  l1 = v [ (j + 1)%4 ];
+	  l2 = v [ (j + 3)%4 ];
+      }
+      else {
+	  for ( j = 0 ; j < 4; j++ ) {
+	      if ( qm -> mesh -> vType [ v[piv[j] ]] == -1 ) break;
+	      l0 = v[ piv[j]       ];
+	      l1 = v[(piv[j] + 1)%4];
+	      l2 = v[(piv[j] + 3)%4];
+	  }
+      }
+      printf(" Pivote for moving %d -> legs %d %d \n ",
+	     l0 + 1, l1 + 1, l2 + 1);
+      printQuadCoords ( qm, star ->quads[q]);
+      qm -> mesh -> uvs [ 2 * l0    ] = 0.5 * ( qm -> mesh -> uvs [ 2 * l1    ] + qm -> mesh -> uvs [ 2 * l2    ]);
+      qm -> mesh -> uvs [ 2 * l0 + 1] = 0.5 * ( qm -> mesh -> uvs [ 2 * l1 + 1] + qm -> mesh -> uvs [ 2 * l2 + 1]);
+      stat = EG_evaluate ( qm -> face, &qm -> mesh -> uvs [ 2 * l0], eval );
+      if ( stat != EGADS_SUCCESS ) {
+	  printf("In checkInvalidElement:: stat after evaluate at %lf %lf -> %d!!\n ",
+		 qm -> mesh -> uvs [ 2 * l0], qm -> mesh -> uvs [ 2 * l0 +1], stat);
+	  return stat;
+      }
+      for ( j = 0; j < 3; j++ )
+	qm -> mesh -> xyzs[ 3 * l0 + j] = eval[j];
+      printQuadCoords ( qm, star ->quads[q]);
+      printMesh(qm, buffer,0);
   }
   for ( q = 0; q < star -> nQ; q++ ) {
       stat = quadAlgebraicArea(qm, minAngle, maxAngle, star -> quads[q], &area, angles, cross);
@@ -1786,14 +1882,15 @@ EG_angleAtVnormalPlane ( meshMap *qm, int vC, int v1, int v2 ) {
 }
 
 
-static double EG_angleAtBoundaryVertex(meshMap *qm, int v ) {
-  int i, j, k, links[2];
+static int EG_angleAtBoundaryVertex(meshMap *qm, int v, int *links, double *size ) {
+  int i, j, k;
   vStar *star = NULL;
-  if ( qm -> mesh -> vType[v - 1 ] < 0 ) return -1.0;
+  *size = 0.0;
+  if ( qm -> mesh -> vType[v - 1 ] < 0 ) return EGADS_INDEXERR;
   i = EG_buildStar ( qm -> mesh, &star, v);
   if ( i != EGADS_SUCCESS || star == NULL ) {
       printf(" Looking at corners: buildstar %d is %d \n ", v, i );
-      return (double)i;
+      return i;
   }
   for ( links[0] = links[1] = k = i = 0 ;i < star -> nQ; i++ ) {
       j = star -> verts[ 2 * i + 1 ] - 1 ;
@@ -1805,35 +1902,34 @@ static double EG_angleAtBoundaryVertex(meshMap *qm, int v ) {
       }
   }
   EG_freeStar ( &star);
-  if ( k >=3 ) return PI * 0.5; // boundary vertex is connected to more than two bounds. Angle is fine
+  if ( k >=3 ) size = PI * 0.5; // boundary vertex is connected to more than two bounds. Angle is fine
   else if ( k != 2 ) {
       printf("EG_angleAtBoundaryVertex:: vertex %d is at surface bounds and connected only to another boundary vertex !!\n ", v);
-      return -1.0;
+      return EGADS_GEOMERR;
   }
-  return EG_angleAtVnormalPlane (qm, v , links[0], links[1] );
+  *size = EG_angleAtVnormalPlane (qm, v , links[0], links[1] );
+  return EGADS_SUCCESS;
 }
 
 static int
 quadAlgebraicArea(meshMap *qm, double minTheta, double maxTheta, int qID, int *validArea, double *theta, double *dotCross ) {
   int     i, qV[4], k, stat, vA, vB, vC;
-  double evalVert[18], cross[4], qNormal[4], vABCD[12], sum, dot, quv[5], projABCD[12];
+  double evalVert[18], cross[4], qNormal[4], vABCD[12], sum, dot, quv[5], projABCD[12], angcross[4];
   stat = checkQuad ( qm -> mesh, qID );
   if ( stat != EGADS_SUCCESS ) {
       printf(" In quadAlgebraicArea:: checking area of quad %d  !!! %d \n", qID, stat );
       return stat;
   }
   stat  = quadAverageCoords (qm, qID, quv, &quv[2]);
-  stat += EG_evaluate(qm -> face, quv, evalVert);
   if ( stat != EGADS_SUCCESS) {
       printf("vectorAtVertexNplane :: Average coordinates for quad %d --> %d!!\n ", qID, stat);
       return stat;
   }
-  //
-  if ( qm -> face -> mtype == SREVERSE )
-    cross_product(&evalVert[6], &evalVert[3], qNormal);
-  else
-    cross_product(&evalVert[3], &evalVert[6], qNormal);
-  unitVector(qNormal, &qNormal[3]);
+  stat = EG_normalToSurface ( qm, quv, qNormal);
+  if ( stat != EGADS_SUCCESS) {
+      printf("quadAlgebraicArea at %d: EG_normalToSurface %d !!\n ", qID, stat);
+      return stat;
+  }
   for ( i = 0 ; i < 4; i++ ) {
       qV[i]      = qm -> mesh ->quadIdx[4*(qID - 1) + i] - 1;
       stat       = EG_projectToTangentPlane(qNormal, evalVert, &qm -> mesh -> xyzs [ 3 * qV[i] ], &projABCD[3 * i]);
@@ -1868,21 +1964,19 @@ quadAlgebraicArea(meshMap *qm, double minTheta, double maxTheta, int qID, int *v
       if      ( fabs(dot - 1.0) < EPS11 ) theta[k] = 0.0;
       else if ( fabs(dot + 1.0) < EPS11 ) theta[k] = PI;
       else                                theta[k] = acos(dot);
-      if ( dotCross[k] < 0)
-	theta[k]  =  2.0 * PI - theta[k];  // we have anti-clockwise orientation. Postive area implies reversed.
-      //      printf(" TRIPLE %d %d %d --> dot %lf theta %lf \n ",
-      //	     qV[vA] + 1,  qV[vB] + 1,  qV[vC] + 1, dotCross[k], theta [ k ]);
+      if ( dotCross[k] < 0 ) angcross[k] = 2.0 * PI - theta [k];
+      else                   angcross[k] = theta [k];
   }
   for ( k = 0 ; k < 4; ++k) {
       if (( qm -> mesh -> vType[ qV[k] ] == -1 ) &&
-	  ( theta[k] > maxTheta || theta[k] < minTheta ) ) *validArea = - 1;
+	  ( angcross[k] > maxTheta || angcross[k] < minTheta ) ) *validArea = - 1;
   }
   if ( *validArea == -1) {
       printf(" ========== INVALID QUAD %d  ========== MIN MAX ANGLES %lf %lf \n", qID, minTheta * 180.0/ PI, maxTheta  * 180.0/ PI) ;
       sum = 0.0;
       for ( k = 0 ; k < 4; ++k) {
-	  printf(" Vertex %d -> angle %f  sum %lf   cross %lf \n ",
-		 qV[k] + 1, theta[k] * 180.0/ PI, sum * 180.0 / PI, dotCross[k]);
+	  printf(" Vertex %d -> angle %f -> %lf  sum %lf   cross %lf \n ",
+		 qV[k] + 1, theta[k],  angcross[k]* 180.0/ PI, sum * 180.0 / PI, dotCross[k]);
 	  sum += theta[k];
       }
       printf(" QUAD INTERNAL ANGLES SUM %.16f ~ %.16f (?)  VALIDAREA %d  \n", sum , 2*PI, *validArea);
@@ -3237,7 +3331,7 @@ static int optimize_angles(meshMap *qm, int nP, /*@unused@*/ /*@null@*/int *pLis
 	  stat = checkInvalidElement(qm, vID[v], qm -> MINANGLE, qm -> MAXANGLE );
 	  if ( stat == EGADS_SUCCESS ) q++;
 	  else stat = checkInvalidElement(qm, vID[v], MINVALIDANGLE, MAXVALIDANGLE);
-	  if ( stat != EGADS_SUCCESS ) continue;
+	  if ( stat != EGADS_SUCCESS ) break;
       }
       if ( stat != EGADS_SUCCESS || q == 0  || fullRegularization == 0 ) break;
       qm -> MINANGLE += 2.0 * PI/ 180.0;
@@ -3260,7 +3354,7 @@ static int optimize_angles(meshMap *qm, int nP, /*@unused@*/ /*@null@*/int *pLis
   EG_free(vID);
   if (stat != EGADS_SUCCESS ) printf(" MESH VALIDIDTY %d \n ", stat );
   printMesh(qm, buffer, 0);
-  return EGADS_SUCCESS;;
+  return stat;
 }
 
 
