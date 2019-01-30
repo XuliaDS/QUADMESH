@@ -186,6 +186,7 @@ static int    EG_createMeshMap        (bodyData *bodydata);
 static double EG_angleAtVnormalPlane  (meshMap *qm, int vC, int v1, int v2 );
 static int    EG_angleAtBoundaryVertex(meshMap *qm, int v, int *links, double *size ) ;
 static int    checkInvalidElement     (meshMap *qm, int vID, int moveNearBd, double minAngle, double maxAngle );
+static int    vertexLinksToBounds (meshMap *qm, int vID );
 static int    quadAngleOrientation    (meshMap *qm, int qID, int *validArea, int *ori, int *order, double *theta );
 static int    quadAverageCoords       (meshMap *qm, int q, double *uv, double *p) ;
 static void   averageCoordsMinusLinks (meshMap *qm, int vc, int l1, int l2 ) ;
@@ -1396,21 +1397,18 @@ averageCoordsMinusLinks ( meshMap *qm, int vc, int l1, int l2 ) {
       if ( i < 2 ) qm -> mesh -> uvs[2 * vc + i] = uv[i];
       qm -> mesh -> xyzs [3 * vc + i] = eval[i];
   }
-  printVertexCoords (qm, vc + 1 ) ;
-  for ( ii = 0 ; ii < k; ii++ ) {
-      printVertexCoords (qm , links[ii] ) ;
-      if ( qm ->mesh -> vType[ links[ii] -1 ] != -1 ) continue;
-      weightedAverage (qm, links[ii] );
-      printVertexCoords (qm, links[ii] ) ;
-  }
-  weightedAverage (qm, vc + 1);
-  for ( i = 0; i < qm -> mesh -> valence[vc][0]; i++ ) {
-      j = qm -> mesh -> valence[vc][2 + i];
-      if ( qm ->mesh -> vType[ j -1 ] != -1 ) continue;
-      weightedAverage (qm, j );
-  }
-
   EG_free(links);
+}
+
+
+static int vertexLinksToBounds (meshMap *qm, int vID ) {
+  int i, j;
+  if ( qm -> mesh -> vType[ vID -1 ] != -1 ) return 1;
+  for (i = 0 ; i < qm -> mesh -> valence[ vID -1 ][0]; i++ ) {
+      j  =  qm -> mesh -> valence[ vID -1 ][2 + i] - 1;
+      if ( qm -> mesh -> vType[ j ] != -1 ) return 1;
+  }
+  return 0;
 }
 
 
@@ -1435,159 +1433,153 @@ static int checkInvalidElement(meshMap *qm, int vID, int moveNearBd, double minA
 	    vj       = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + piv[k] ];
 	    links[0] = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + ( piv[k] + 1)%4 ];
 	    links[1] = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + ( piv[k] + 3)%4 ];
-	    averageCoordsMinusLinks (qm, vj, links[0], links[1]);
+	    if ( moveNearBd == 1 || vertexLinksToBounds (qm, vj) == 0 )
+	      averageCoordsMinusLinks (qm, vj, links[0], links[1]);
 	}
       stat = quadAngleOrientation(qm, star -> quads[q], &area, orient, piv, angles);
       if ( area == 1 && angles[ piv[0] ] <= maxAngle && angles [ piv[3]] >= minAngle ) {
 	  printf(" area %d angle %lf max %lf angle %lf min %lf \n ", area, angles[piv[0]], maxAngle, angles[piv[3]], minAngle);
 	  continue;
       }
-      for (j = 0; j < 4; j++ ) {
-	  vj = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + piv[j] ] - 1;
-	  if ( qm -> mesh -> vType [vj] != -1 ) continue;
-	  for ( try = ii = 0; ii < qm -> mesh -> valence[vj][0]; ii++) {
-	      aux = qm -> mesh -> valence[vj][2 + ii] - 1;
-	      if ( qm -> mesh -> vType [ aux ] != -1 ) {
-		  try = 1 ;
-		  break;
-	      }
-	  }
-	  //if ( moveNearBd == 0 && try == 1 ) continue;
-	  printf(" j = %d -- > WE ARE MOVING VERTEX %d \n ", j, vj + 1);
-	  weightedAverage ( qm, vj + 1 ) ;
+      for (j   = 0; j < 4; j++ ) {
+	  vj   = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + piv[j] ] - 1;
+	  if ( moveNearBd == 1 || vertexLinksToBounds (qm, vj) == 0 )
+	    weightedAverage ( qm, vj + 1 ) ;
+      }
+      stat = quadAngleOrientation(qm, star -> quads[q], &area, orient, piv, angles);
+  }
+  if ( moveNearBd == 1 ) {
+      stat = EG_getRange ( qm -> face, range, &i);
+      for ( q = 0; q < star -> nQ; q++ ) {
+	  if ( EG_quadIsBoundary ( qm -> mesh, star -> quads[q] ) == 0 ) continue;
 	  stat = quadAngleOrientation(qm, star -> quads[q], &area, orient, piv, angles);
-	  for  ( k = 0; k < 4; k++ )
-	    if ( orient [piv[k]] == -1 && maxAngle < MAXVALIDANGLE ) area = 0;
-	  if ( area == 1 && angles[ piv[0] ] <= maxAngle && angles [ piv[3]] >= minAngle ) break;
+	  if  ( area == 1   ) continue;
+	  for ( j = 0 ; j < 4; j++ ) {
+	      vj  = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + piv[j] ];
+	      if ( qm -> mesh -> vType [vj - 1] == -1 ) continue;
+	      stat = EG_angleAtBoundaryVertex (qm, vj, links, &anglebd);
+	      printf(" CENTRE %d LINKS %d %d angle %f \n ", vj, links[0], links[1], anglebd );
+	      if ( stat != EGADS_SUCCESS){
+		  printf("Inside checkInvalid: EG_angleAtBoundaryVertex %d = %d!!\n", vj, stat);
+		  EG_free(star);
+		  return stat;
+	      }
+	      stat       = EG_buildStar ( qm -> mesh, &star2, vj );
+	      if ( stat != EGADS_SUCCESS || star2 == NULL ) {
+		  printf("checkInvalidElement: averageCoords:: buildStar %d is NULL --> %d!!\n", vj + 1, stat);
+		  EG_freeStar(&star);
+		  return stat;
+	      }
+	      stat = EG_normalToSurface (qm, &qm -> mesh -> uvs [ 2 * (vj - 1 ) ], normal);
+	      printQuadCoords ( qm, star -> quads[q] );
+	      printf(" normal to surface %lf %lf %lf \n ", normal[0], normal[1], normal[2] );
+	      if ( stat != EGADS_SUCCESS ) {
+		  printf("EG_checkInvalidElement: EG_normalToSurface at %d --> %d!!\n", vj + 1, stat);
+		  return stat;
+	      }
+	      for ( i   = 0 ; i < 2; i++ ) {
+		  tB[i] = qm ->mesh -> uvs [ 2 * ( links[0] - 1) + i];
+		  tA[i] = qm ->mesh -> uvs [ 2 * ( vj       - 1) + i];
+	      }
+	      stat      = EG_projectToTangentPlane(normal,
+						   &qm -> mesh -> xyzs [ 3 * (vj - 1)],
+						   &qm -> mesh -> xyzs [ 3 * (links[0] -1)], proj);
+	      for ( i   = 0 ; i < 3; i++ )
+		vec1[i] = proj[i] - qm -> mesh -> xyzs [ 3 * (vj - 1) + i];
+	      unitVector (vec1, &vec1[3] );
+	      for ( i = nl = 0 ; i < star2 -> nQ; i++ ) {
+		  aux = star2 -> verts [ 2 * i + 1 ] -1 ;
+		  if ( qm -> mesh -> vType [aux] == -1 ) nl++;
+		  if ( aux + 1 == links[0] ) i0 = i;
+	      }
+	      for ( dir = 0 ; dir < 2; dir++ ) {
+		  angles[0]  = 1.0 / (double)(nl + 1) * anglebd ;
+		  if ( dir  ==  1 ) angles[0] = 2.0 * PI - angles[0];
+		  printf(" ANGLE TEST %f \n ", angles[0] );
+		  vt[0]      = ( tB[0] - tA[0] ) * cos ( angles[0] ) - ( tB[1] - tA[1] ) * sin ( angles[0] );
+		  vt[1]      = ( tB[0] - tA[0] ) * sin ( angles[0] ) + ( tB[1] - tA[1] ) * cos ( angles[0] );
+		  tn[0]      = tA[0] + vt[0];
+		  tn[1]      = tA[1] + vt[1];
+		  printf(" uA %d %f %f --- uB %d %f  %f  move away %f\n ", vj, tA[0], tA[1], links[0], tB[0], tB[1], 0.5 *qm -> minsize );
+		  stat       = moveDistAway ( qm, 0.5 * qm -> minsize , tA, tn );
+		  if ( stat != EGADS_SUCCESS ) {
+		      if ( dir == 1 ) {
+			  printf("we have gone both directions  and still out of domain !!!! \n ");
+			  EG_freeStar ( &star);
+			  EG_freeStar ( &star2);
+			  return EGADS_GEOMERR;
+		      }
+		      continue;
+		  }
+		  stat      = EG_evaluate ( qm -> face, tn, eval);
+		  printf(" Evaluate %lf %lf --> %lf %lf %lf \n ", tn[0], tn[1], eval[0], eval[1], eval[2]);
+		  printf(" uA %f %f --- uB %f  %f  \n ", tA[0], tA[1], tB[0], tB[1] );
+		  if ( stat != EGADS_SUCCESS ) {
+		      printf(" We can't evaluate at EPS distance from vertex !\n ");
+		      if ( dir == 1 ) {
+			  printf("we have gone both directions  and still out of domain !!!! \n ");
+			  EG_freeStar ( &star);
+			  EG_freeStar ( &star2);
+			  return EGADS_GEOMERR;
+		      }
+		      continue;
+		  }
+		  stat = EG_projectToTangentPlane(normal, &qm -> mesh -> xyzs [ 3 * (vj - 1)], eval, &proj[3]);
+		  if ( stat != EGADS_SUCCESS ) {
+		      printf("EG_checkInvalidElement: EG_projectToTangentPlane %d, %d --> %d!!\n", vj, links[0], stat);
+		      return stat;
+		  }
+		  for ( i = 0 ; i < 3; i++ )
+		    vec2[i] = proj[3 + i] - qm -> mesh -> xyzs [ 3 * (vj - 1) + i];
+		  unitVector    (vec2, &vec2[3] );
+		  cross_product (vec1, vec2, cross);
+		  if ( dotProduct (normal, cross ) > 0 ) break;
+		  if ( dir == 1 ) {
+		      printf(" both directions give negative dot product !!\n ");
+		      EG_freeStar ( &star);
+		      EG_freeStar ( &star2);
+		      return EGADS_GEOMERR;
+		  }
+	      }
+	      printf(" d = %d -- NOW COMPUTE ALL COORDINATES \n ", dir ) ;
+	      for (k = 0 ; k < nl ; k++ ) {
+		  aux       = star2 -> verts [ star2 -> idxV [ 2 * (i0 + k + 1) + 1 ] ] - 1;
+		  angles[0] = (double ) ( k + 1) / (double)(nl + 1) * anglebd ;
+		  if ( dir ==  1 ) angles[0] = 2.0 * PI - angles[0];
+		  vt[0]      = ( tB[0] - tA[0] ) * cos ( angles[0] ) - ( tB[1] - tA[1] ) * sin ( angles[0] );
+		  vt[1]      = ( tB[0] - tA[0] ) * sin ( angles[0] ) + ( tB[1] - tA[1] ) * cos ( angles[0] );
+		  printf(" uA %f %f --- uB %f  %f  move away %f\n ", tA[0], tA[1], tB[0], tB[1], qm -> minsize );
+		  tn[0]      = tA[0] + vt[0];
+		  tn[1]      = tA[1] + vt[1];
+		  stat       = moveDistAway ( qm, qm -> minsize, tA, tn );
+		  stat      = EG_evaluate ( qm -> face, tn, eval);
+		  printf(" Evaluate %lf %lf --> %lf %lf %lf \n ", tn[0], tn[1], eval[0], eval[1], eval[2]);
+		  if ( stat != EGADS_SUCCESS ) {
+		      printf(" We have messed up with recomputing  !!!! \n ");
+		      EG_freeStar ( &star);
+		      EG_freeStar ( &star2);
+		      return EGADS_GEOMERR;
+		  }
+		  printVertexCoords (qm, aux + 1);
+		  for ( i = 0; i < 3; i++ ) {
+		      if ( i < 2 ) qm -> mesh -> uvs[ 2 * aux + i] = tn[i];
+		      qm -> mesh -> xyzs[ 3 * aux + i]             = eval[i];
+		  }
+		  printVertexCoords (qm, aux + 1);
+		  stat = checkInvalidElement ( qm , aux + 1, 0, minAngle, maxAngle);
+	      }
+	      EG_freeStar(&star2);
+	  }
       }
   }
   printMesh(qm, buffer,0);
-  printf(" Check Invalid for vertex %d put back to place if invalid bounds \n ", vID );
-  if ( moveNearBd == 0 ) return stat;
-  stat = EG_getRange ( qm -> face, range, &i);
-  for ( q = 0; q < star -> nQ; q++ ) {
-      if ( EG_quadIsBoundary ( qm -> mesh, star -> quads[q] ) == 0 ) continue;
+  for ( i = q = 0; q < star -> nQ; q++ ) {
       stat = quadAngleOrientation(qm, star -> quads[q], &area, orient, piv, angles);
-      if  ( area == 1   ) continue;
-      for ( j = 0 ; j < 4; j++ ) {
-	  vj  = qm -> mesh -> quadIdx [ 4 * ( star -> quads[q] - 1) + piv[j] ];
-	  if ( qm -> mesh -> vType [vj - 1] == -1 ) continue;
-	  stat = EG_angleAtBoundaryVertex (qm, vj, links, &anglebd);
-	  printf(" CENTRE %d LINKS %d %d angle %f \n ", vj, links[0], links[1], anglebd );
-	  if ( stat != EGADS_SUCCESS){
-	      printf("Inside checkInvalid: EG_angleAtBoundaryVertex %d = %d!!\n", vj, stat);
-	      EG_free(star);
-	      return stat;
-	  }
-	  stat       = EG_buildStar ( qm -> mesh, &star2, vj );
-	  if ( stat != EGADS_SUCCESS || star2 == NULL ) {
-	      printf("checkInvalidElement: averageCoords:: buildStar %d is NULL --> %d!!\n", vj + 1, stat);
-	      EG_freeStar(&star);
-	      return stat;
-	  }
-	  stat = EG_normalToSurface (qm, &qm -> mesh -> uvs [ 2 * (vj - 1 ) ], normal);
-	  printQuadCoords ( qm, star -> quads[q] );
-	  printf(" normal to surface %lf %lf %lf \n ", normal[0], normal[1], normal[2] );
-	  if ( stat != EGADS_SUCCESS ) {
-	      printf("EG_checkInvalidElement: EG_normalToSurface at %d --> %d!!\n", vj + 1, stat);
-	      return stat;
-	  }
-	  for ( i   = 0 ; i < 2; i++ ) {
-	      tB[i] = qm ->mesh -> uvs [ 2 * ( links[0] - 1) + i];
-	      tA[i] = qm ->mesh -> uvs [ 2 * ( vj       - 1) + i];
-	  }
-	  stat      = EG_projectToTangentPlane(normal,
-					       &qm -> mesh -> xyzs [ 3 * (vj - 1)],
-					       &qm -> mesh -> xyzs [ 3 * (links[0] -1)], proj);
-	  for ( i   = 0 ; i < 3; i++ )
-	    vec1[i] = proj[i] - qm -> mesh -> xyzs [ 3 * (vj - 1) + i];
-	  unitVector (vec1, &vec1[3] );
-	  for ( i = nl = 0 ; i < star2 -> nQ; i++ ) {
-	      aux = star2 -> verts [ 2 * i + 1 ] -1 ;
-	      if ( qm -> mesh -> vType [aux] == -1 ) nl++;
-	      if ( aux + 1 == links[0] ) i0 = i;
-	  }
-	  for ( dir = 0 ; dir < 2; dir++ ) {
-	      angles[0]  = 1.0 / (double)(nl + 1) * anglebd ;
-	      if ( dir  ==  1 ) angles[0] = 2.0 * PI - angles[0];
-	      printf(" ANGLE TEST %f \n ", angles[0] );
-	      vt[0]      = ( tB[0] - tA[0] ) * cos ( angles[0] ) - ( tB[1] - tA[1] ) * sin ( angles[0] );
-	      vt[1]      = ( tB[0] - tA[0] ) * sin ( angles[0] ) + ( tB[1] - tA[1] ) * cos ( angles[0] );
-	      tn[0]      = tA[0] + vt[0];
-	      tn[1]      = tA[1] + vt[1];
-	      printf(" uA %d %f %f --- uB %d %f  %f  move away %f\n ", vj, tA[0], tA[1], links[0], tB[0], tB[1], 0.5 *qm -> minsize );
-	      stat       = moveDistAway ( qm, 0.5 * qm -> minsize , tA, tn );
-	      if ( stat != EGADS_SUCCESS ) {
-		  if ( dir == 1 ) {
-		      printf("we have gone both directions  and still out of domain !!!! \n ");
-		      EG_freeStar ( &star);
-		      EG_freeStar ( &star2);
-		      return EGADS_GEOMERR;
-		  }
-		  continue;
-	      }
-	      stat      = EG_evaluate ( qm -> face, tn, eval);
-	      printf(" Evaluate %lf %lf --> %lf %lf %lf \n ", tn[0], tn[1], eval[0], eval[1], eval[2]);
-	      printf(" uA %f %f --- uB %f  %f  \n ", tA[0], tA[1], tB[0], tB[1] );
-	      if ( stat != EGADS_SUCCESS ) {
-		  printf(" We can't evaluate at EPS distance from vertex !\n ");
-		  if ( dir == 1 ) {
-		      printf("we have gone both directions  and still out of domain !!!! \n ");
-		      EG_freeStar ( &star);
-		      EG_freeStar ( &star2);
-		      return EGADS_GEOMERR;
-		  }
-		  continue;
-	      }
-	      stat = EG_projectToTangentPlane(normal, &qm -> mesh -> xyzs [ 3 * (vj - 1)], eval, &proj[3]);
-	      if ( stat != EGADS_SUCCESS ) {
-		  printf("EG_checkInvalidElement: EG_projectToTangentPlane %d, %d --> %d!!\n", vj, links[0], stat);
-		  return stat;
-	      }
-	      for ( i = 0 ; i < 3; i++ )
-		vec2[i] = proj[3 + i] - qm -> mesh -> xyzs [ 3 * (vj - 1) + i];
-	      unitVector    (vec2, &vec2[3] );
-	      cross_product (vec1, vec2, cross);
-	      if ( dotProduct (normal, cross ) > 0 ) break;
-	      if ( dir == 1 ) {
-		  printf(" both directions give negative dot product !!\n ");
-		  EG_freeStar ( &star);
-		  EG_freeStar ( &star2);
-		  return EGADS_GEOMERR;
-	      }
-	  }
-	  printf(" d = %d -- NOW COMPUTE ALL COORDINATES \n ", dir ) ;
-	  for (k = 0 ; k < nl ; k++ ) {
-	      aux       = star2 -> verts [ star2 -> idxV [ 2 * (i0 + k + 1) + 1 ] ] - 1;
-	      angles[0] = (double ) ( k + 1) / (double)(nl + 1) * anglebd ;
-	      if ( dir ==  1 ) angles[0] = 2.0 * PI - angles[0];
-	      vt[0]      = ( tB[0] - tA[0] ) * cos ( angles[0] ) - ( tB[1] - tA[1] ) * sin ( angles[0] );
-	      vt[1]      = ( tB[0] - tA[0] ) * sin ( angles[0] ) + ( tB[1] - tA[1] ) * cos ( angles[0] );
-	      printf(" uA %f %f --- uB %f  %f  move away %f\n ", tA[0], tA[1], tB[0], tB[1], qm -> minsize );
-	      tn[0]      = tA[0] + vt[0];
-	      tn[1]      = tA[1] + vt[1];
-	      stat       = moveDistAway ( qm, qm -> minsize, tA, tn );
-	      stat      = EG_evaluate ( qm -> face, tn, eval);
-	      printf(" Evaluate %lf %lf --> %lf %lf %lf \n ", tn[0], tn[1], eval[0], eval[1], eval[2]);
-	      if ( stat != EGADS_SUCCESS ) {
-		  printf(" We have messed up with recomputing  !!!! \n ");
-		  EG_freeStar ( &star);
-		  EG_freeStar ( &star2);
-		  return EGADS_GEOMERR;
-	      }
-	      printVertexCoords (qm, aux + 1);
-	      for ( i = 0; i < 3; i++ ) {
-		  if ( i < 2 ) qm -> mesh -> uvs[ 2 * aux + i] = tn[i];
-		  qm -> mesh -> xyzs[ 3 * aux + i]             = eval[i];
-	      }
-	      printVertexCoords (qm, aux + 1);
-	      stat = checkInvalidElement ( qm , aux + 1, 0, minAngle, maxAngle);
-	  }
-	  EG_freeStar(&star2);
-      }
+      if ( area != 1 || angles[ piv[0] ] > maxAngle || angles [ piv[3]] < minAngle ) i = 1;
   }
   EG_freeStar (&star);
   printMesh(qm, buffer,0);
+  if ( i == 1 ) return EGADS_GEOMERR;
   return EGADS_SUCCESS;
 }
 
@@ -3128,6 +3120,14 @@ static int optimize_angles(meshMap *qm, int nP, /*@unused@*/ /*@null@*/int *pLis
       }
       qm -> MINANGLE += dthetam;
       qm -> MAXANGLE -= dthetaM;
+      for ( q = v = 0 ; v < nV; v++) {
+	  stat = checkInvalidElement(qm, vID[v], 0, 0.0, 180.0 ) ;
+	  if ( stat != EGADS_SUCCESS ) {
+	      printf(" Mesh is invalid for MIN MAX TOTALS [0, 200 deg]\n");
+	      break;
+	  }
+      }
+      if ( stat != EGADS_SUCCESS ) break;
       if (    qm -> MAXANGLE < qm -> MINANGLE  ) break;
       if ( fullRegularization == 2 && it == 10 ) break;
       printf(" it %d -> min max %lf %lf \n ", it, qm ->MINANGLE, qm ->MAXANGLE);
