@@ -1710,11 +1710,11 @@ static int makePositiveAngles (meshMap *qm, int qID, double minAngle, double max
 	  iA  = qm -> mesh -> quadIdx [ 4 * ( qID - 1 ) + ( k + 1) %4];
 	  iB  = qm -> mesh -> quadIdx [ 4 * ( qID - 1 ) + ( k + 3) %4];
 	  ang = EG_angleAtVnormalPlane( qm, iO, iA, iB);
-	  if (area == 1 && ang > maxAngle ) {
+	  if (areaOpt == 1 && ang > maxAngle ) {
 	      printf("  ang %f maxangle %f   reduce %d %d  %d\n ", ang, maxAngle, iO, iA, iB );
 	      EG_reduceAngle(qm, 0.01, iO, iA, iB , 1);
 	      printf("\n\n AFTER i = %d --> angle centre,%d  %d %d --> %f \n ",i, iO, iA, iB , ang );
-	  } else if (area == 1 &&  ang < minAngle ) {
+	  } else if (areaOpt == 1 &&  ang < minAngle ) {
 	      printf("  ang %f  mainagle %f  reduce %d %d  %d\n ", ang, minAngle, iO, iA, iB );
 	      EG_reduceAngle(qm, 0.01, iO, iA, iB , 0);
 	      printf("\n\n AFTER i = %d --> angle centre,%d  %d %d --> %f \n ",i, iO, iA, iB , ang );
