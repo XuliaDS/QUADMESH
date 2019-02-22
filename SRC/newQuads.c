@@ -1602,12 +1602,12 @@ static void updateVertex ( meshMap *qm, int vID, double *uv ) {
 
 static void averageCoords (meshMap *qm, int vID, double minAngle, double maxAngle ) {
   int  fix = 0, vA, vB, i, j, k, auxID = 0, stat, links[2], nI, i0, l1, l2, it, itMAX = 100, piv[4], ori[4];
-  double uvc[2], angle, optangle, angL0, ang1, ang2, xyz0[3], seg, dt, dist, angles[4] ;
+  double uvc[2], angle, optangle, angL0, ang1, ang2, xyz0[3], seg, dt, dist, angles[4], *length = NULL, totarc ;
   vStar *star = NULL;
   if ( qm -> mesh -> vType[ vID -1] != -1 ||
       (qm -> vFix[0] > 0 && inList ( qm -> vFix[0], &qm -> vFix[1], vID ) >= 0  )) return;
   printVertexCoords (qm, vID );
-  printf("========== weighted Average coordinates %d fix %d smooth %d \n ", vID, j, qm -> smooth ) ;
+  printf("========== weighted Average coordinates %d \n ", vID );
   uvc[0] = qm -> mesh -> uvs [ 2 * ( vID - 1 )     ];
   uvc[1] = qm -> mesh -> uvs [ 2 * ( vID - 1 ) + 1 ];
   stat   = EG_buildStar ( qm -> mesh, &star, vID);
@@ -1664,16 +1664,24 @@ static void averageCoords (meshMap *qm, int vID, double minAngle, double maxAngl
 		  break;
 	      }
 	  }
-	  j      = 1;
+	  length = EG_alloc ( star -> nQ * sizeof ( double ) ) ;
+	  if (length == NULL ) {
+	      EG_free (star );
+	      return;
+	  }
+	  totarc = 0.0;
+	  for (k = 0; k < star -> nQ; k++) {
+	      length[k] = EG_segment ( qm, &qm -> mesh -> uvs [ 2 * ( vID -1 ) ], &qm -> mesh -> uvs [ 2 * ( star -> verts [ 2 * i + 1] -1 ) ] );
+	      totarc   += length[k];
+	  }
+	  uvc[0] = 0.0; uvc[1] = 0.0;
 	  for (k = 0; k < star -> nQ; k++) {
 	      auxID   = star -> verts [ 2 * k + 1] - 1;
-	      uvc[0] += qm -> mesh -> uvs     [2 * auxID    ];
-	      uvc[1] += qm -> mesh -> uvs     [2 * auxID + 1];
-	      j++;
+	      uvc[0] += length[k] / totarc * qm -> mesh -> uvs     [2 * auxID    ];
+	      uvc[1] += length[k] / totarc * qm -> mesh -> uvs     [2 * auxID + 1];
 	  }
-	  uvc[0] /= (double)j;
-	  uvc[1] /= (double)j;
 	  updateVertex (qm, vID, uvc);
+	  EG_free ( length );
       }
   }
   printVertexCoords (qm, vID );
@@ -3576,7 +3584,7 @@ static int optimize_angles(meshMap *qm, int nP, /*@unused@*/ /*@null@*/int *pLis
 		  if ( j == 0 ) k = i;
 		  else  k = qm -> mesh -> quadAdj [ 4 * i + j - 1] - 1;
 		  if ( checkQuad ( qm -> mesh, k + 1 ) != EGADS_SUCCESS ) continue;
-		  if ( makePositiveAngles(qm, k + 1, minT, maxT, 1 )  <= 0 ) {
+		  if ( makePositiveAngles(qm, k + 1, minT, maxT, 1 )  < 0 ) {
 		      printf(" Mesh is invalid for MIN MAX TOTALS [0, 200 deg]\n");
 		      printMesh(qm , buffer, 1);
 		      return EGADS_GEOMERR;
@@ -3587,6 +3595,14 @@ static int optimize_angles(meshMap *qm, int nP, /*@unused@*/ /*@null@*/int *pLis
 	  maxT -= dtheta;
 	  if ( maxT < minT || fullRegularization == 2) break;
 	  it++;
+      }
+      for ( i = 0; i < qm -> mesh -> totQuads; i++ ) {
+	  if ( checkQuad ( qm -> mesh, i + 1 ) != EGADS_SUCCESS ) continue;
+	  if ( makePositiveAngles(qm, i + 1, minT, maxT, 1 )  <= 0 ) {
+	      printf(" Mesh is invalid for MIN MAX TOTALS [0, 200 deg]\n");
+	      printMesh(qm , buffer, 1);
+	      return EGADS_GEOMERR;
+	  }
       }
       if ( stat != EGADS_SUCCESS) {
 	  snprintf(buffer,500, "thisMesh_%d.txt", qm -> fID);
