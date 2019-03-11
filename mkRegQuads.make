@@ -9,7 +9,7 @@ TDIR = BUILDS
 #ODIR = .
 #TDIR = $(ESP_ROOT)/bin
 #endif
-FILE = newQuads
+FILE = regQuads
 SFILE = $(FILE).c
 SDIR = SRC
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o  $(LDIR)/libwsserver.a
