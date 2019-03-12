@@ -1,0 +1,45 @@
+# nosecone2
+# written by Justin Gray
+
+despmtr h 0.9
+set     w 1/2.
+
+despmtr wo0 .60
+despmtr wo1 .78
+despmtr wo2 .85 
+despmtr wo3 .95
+
+despmtr ho0 .70
+despmtr ho1 .50
+despmtr ho2 .40
+despmtr ho3 .20
+
+skbeg 0 h 0
+    spline w*wo0 h*ho0 0
+    spline w*wo1 h*ho1 0 
+    spline w*wo2 h*ho2 0 
+    spline w*wo3 h*ho3 0  
+    spline w 0 0
+    linseg 0 0 0 
+    linseg 0 h 0 
+skend
+
+revolve 0 0 0 1 0 0 360
+
+#======================================#
+# automatically generated verification #
+# OpenCSM  1.13      OpenCASCADE 6.8.1 #
+#======================================#
+select    body 10
+   assert         3      @itype       0  1
+   assert         2      @nnode       0  1
+   assert         3      @nedge       0  1
+   assert         2      @nface       0  1
+   assert   6.98063e-01  @volume  -.001  1
+   assert   5.86107e+00  @area    -.001  1
+   assert   1.72192e-01  @xcg     -.001  1
+   assert   1.52874e-06  @ycg     0.001  1
+   assert   0.00000e+00  @zcg     0.001  1
+
+dump nose.egads
+end
