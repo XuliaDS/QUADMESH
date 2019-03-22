@@ -4,7 +4,7 @@ include $(IDIR)/$(ESP_ARCH)
 LDIR  = $(ESP_ROOT)/lib
 ODIR  = obj
 TDIR  = BUILDS
-FILE  = regQuads
+FILE  = bq
 SFILE = $(FILE).c
 SDIR  = SRC
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
@@ -12,7 +12,7 @@ $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o
 		-L$(LDIR) -legads -lm
 
 $(ODIR)/$(FILE).o:	$(SDIR)/$(SFILE) $(IDIR)/egads.h $(IDIR)/egadsTypes.h \
-			$(IDIR)/egadsErrors.h $(SDIR)/$(FILE).h
+			$(IDIR)/egadsErrors.h
 	$(CC) -g -pg -c $(COPTS) $(DEFINE) -DSTANDALONE -I$(IDIR) \
 		 $(SDIR)/$(SFILE) -o $(ODIR)/$(FILE).o
 

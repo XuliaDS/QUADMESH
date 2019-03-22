@@ -20,7 +20,7 @@
 int main(int argc, char *argv[])
 {
   int       round, i, j, f, stat, *nvert = NULL , *nquad = NULL, quad[4], vt = 0, qt = 0, *segs = NULL, *tris = NULL;
-  float     focus[4], colorLine[3], colorBox[3], angle;
+  float     focus[4], colorLine[3], colorBox[3];
   double    size, box[6], bigBox[6],  *xyzs = NULL;
   char      gpname[34], *startapp;
   wvContext *cntxt;
@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
        colorLine[2] = 0.2;
        break;
     case 2:
+    default:
        printf(" YOU HAVE CHOSEN ACDL\n ");
        colorBox[0]  = 255.0/255.0;
        colorBox[1]  = 255.0/255.0;

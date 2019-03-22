@@ -8,8 +8,8 @@ despmtr   taper     0.5       -
 despmtr   twist     5.0       deg
 despmtr   lesweep   30.0      deg
 despmtr   dihedral  5.0       deg
-despmtr   fracle    0.075     percent
-despmtr   fracte    0.725     percent
+despmtr   fracle    0.085     percent
+despmtr   fracte    0.825     percent
 
 # internal parameters
 set       cmean     sqrt(area/aspect)

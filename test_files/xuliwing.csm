@@ -35,11 +35,11 @@ translate           xtip      ytip      -sspan
 blend
 
 # cut box
-skbeg           -0.1           ybot  0
-    linseg      -0.1           ybot  0.15*(-sspan-0.1)
-    linseg      croot+xtip  ybot  0.15*(-sspan-0.1)
+skbeg           -0.1        ybot  0
+    linseg      -0.1        ybot  0.05*(-sspan-0.1)
+    linseg      croot+xtip  ybot  0.05*(-sspan-0.1)
     linseg      croot+xtip  ybot  0
-    linseg      -0.1           ybot  0
+    linseg      -0.1        ybot  0
 
 #skbeg           fracle*croot      ybot  +extend
  #   linseg      fracle*ctip+xtip  ybot  -sspan-extend
