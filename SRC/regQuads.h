@@ -2,8 +2,6 @@
 #include <string.h>
 
 
-
-
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -71,10 +69,9 @@ typedef struct{
 } quadGroup;
 
 
-extern int  EG_outLevel(const egObject *object );
+extern int  EG_outLevel(const egObject *object);
 
 extern int  EG_createMeshMap(bodyQuad *bodydata, int uvtype);
 extern int  EG_fullMeshRegularization(meshMap *qm);
 extern int  EG_makeQuadTess(bodyQuad bodydata, ego *quadTess);
 extern void EG_destroymeshMap(bodyQuad *bodydata);
-
