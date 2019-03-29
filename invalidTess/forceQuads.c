@@ -172,6 +172,8 @@ int main(int argc, char *argv[])
     params[0] = arg;
     sscanf(argv[4], "%f", &arg);
     params[1] = arg;
+    printf(" Using angle = %lf,  relSide = %lf,  relSag = %lf\n",
+        params[2], params[0], params[1]);
     params[0] *= size;
     params[1] *= size;
   }
@@ -231,8 +233,6 @@ int main(int argc, char *argv[])
     QUADTESS = 1;
 #endif
   }
-  printf(" Using angle = %lf,  relSide = %lf,  relSag = %lf\n",
-          params[2], params[0], params[1]);
   printf(" \n");
 
   /* create the WebViewer context */
@@ -253,6 +253,7 @@ int main(int argc, char *argv[])
 
   /* make the scene */
   for (ngp = sum = stat = ibody = 0; ibody < nbody; ibody++) {
+    printf(" NGE P %d\n",ngp);
     quad = 0;
     stat = EG_attributeRet(bodydata[ibody].tess, ".tessType", &atype,
         &alen, &ints, &reals, &string);
@@ -327,10 +328,19 @@ int main(int argc, char *argv[])
 	  printf(" wv_addGPrim = %d for %s!\n", stat, gpname);
 	if (stat > 0) ngp = stat+1;
 	sum += ntri;
+	printf("BODY DATA VERTEX %d \n",bodydata[0].plen);
 	snprintf(fn, 100, "fqFace_%d", i + 1 );
 	fil = fopen(fn, "w");
 	if ( fil == NULL ) continue;
 	for (k = 0; k < nseg; k++) {
+	    if ( segs[2*k] < 0 || segs [ 2 * k] > len ) {
+		printf(" VALUE %d ouT OF BOUNDS %d \n ", segs[ 2 * k], len );
+		exit(1);
+	    }
+	    if ( segs[2*k  +1] < 0 || segs [ 2 * k] > len ) {
+		printf(" VALUE %d ouT OF BOUNDS %d \n ", segs[ 2 * k + 1], len );
+		exit(1);
+	    }
 	    fprintf(fil, "%lf %lf %lf\n", xyzs[ 3 * ( segs[2 * k] - 1 )],
 		    xyzs[ 3 * ( segs[2 * k] - 1 ) + 1], xyzs[ 3 * ( segs[2 * k] - 1 ) + 2]);
 	    fprintf(fil, "%lf %lf %lf\n\n\n", xyzs[ 3 * ( segs[2 * k + 1] - 1 )],

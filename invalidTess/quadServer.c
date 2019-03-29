@@ -19,11 +19,10 @@
 
 int main(int argc, char *argv[])
 {
-  int       round, i, j, f, stat, *nvert = NULL , *nquad = NULL, quad[4],x,
-      vt = 0, qt = 0, *segs = NULL, *tris = NULL, *nf = NULL, *piv = NULL, min;
+  int       round, i, j, f, stat, *nvert = NULL , *nquad = NULL, quad[4], vt = 0, qt = 0, *segs = NULL, *tris = NULL;
   float     focus[4], colorLine[3], colorBox[3];
   double    size, box[6], bigBox[6],  *xyzs = NULL;
-  char      gpname[34], *startapp, tmp[256], str[256];
+  char      gpname[34], *startapp;
   wvContext *cntxt;
   wvData    items[5];
   float     eye[3]    = {0.0, 0.0, 7.0};
@@ -70,9 +69,7 @@ int main(int argc, char *argv[])
 
   nvert = (int *)malloc(argc * sizeof (int));
   nquad = (int *)malloc(argc * sizeof (int));
-  nf    = (int *)malloc(argc * sizeof (int));
-  piv   = (int *)malloc(argc * sizeof (int));
-  if ( nvert == NULL || nquad == NULL || nf == NULL || piv == NULL) {
+  if ( nvert == NULL || nquad == NULL ) {
       printf(" Error allocating memo \n ");
       return 1;
   }
@@ -82,32 +79,11 @@ int main(int argc, char *argv[])
       printf(" failed to create wvContext!\n");
       return 1;
   }
-  for ( f = 1 ; f < argc; f++ ) {
-      tmp[0]='\0';
-      snprintf(str, 256,"%s", argv[f]);
-      while (sscanf(str,"%[^0123456789]%s",tmp, str) > 1
-	  ||sscanf(str,"%d%s",&x,str))
-	{
-	  if (tmp[0]=='\0') nf[f] = x;
-	  tmp[0]='\0';
-	}
-      piv[f] = f;
-  }
-  for ( f = 1 ; f < argc; f++ ) {
-      for ( i = 1; i < argc - f ; i++ ) {
-	  if ( nf[piv[i]] > nf[piv[i + 1]]) {
-	      min      = piv[i    ];
-	      piv[i ]  = piv[i + 1];
-	      piv[i+1] = min;
-	  }
-      }
-  }
   for ( round = 0 ; round < 2; round++) {
       for ( f = 1 ; f < argc; f++ ) {
-	  fp = fopen(argv[piv[f]], "r");
-	  printf("openfile %s\n ", argv[piv[f]]);
+	  fp = fopen(argv[f], "r");
 	  if (fp == NULL) {
-	      printf("\n ERROR: Opening %s!\n\n", argv[piv[f]]);
+	      printf("\n ERROR: Opening %s!\n\n", argv[f]);
 	      return 1;
 	  }
 	  j = fscanf(fp, "%d %d", &nvert[f], &nquad[f]);
@@ -116,8 +92,9 @@ int main(int argc, char *argv[])
 	      fclose(fp);
 	      return 1;
 	  }
-	  vt  += nvert[f];
-	  qt  += nquad[f];
+	  vt += nvert[f];
+	  qt += nquad[f];
+	  printf("\n nVert = %d   nQuad = %d\n", nvert[f], nquad[f]);
 	  xyzs = (double *) malloc(3*nvert[f]*sizeof(double));
 	  tris = (int    *) malloc(6*nquad[f]*sizeof(int));
 	  segs = (int    *) malloc(8*nquad[f]*sizeof(int));
@@ -162,6 +139,8 @@ int main(int argc, char *argv[])
 	      }
 	  }
 	  if ( round == 0 ) continue;
+	  printf(" BOUNDING BOX x %f %f  y %f  %f z  %f  %f\n ",
+		 bigBox[0], bigBox[3], bigBox[1], bigBox[4], bigBox[2], bigBox[5]);
 	  for ( j = 0 ; j < 6; j++ ) box[j] = bigBox[j];
 	  size = box[3]-box[0];
 	  if (size < box[4]-box[1]) size = box[4]-box[1];
@@ -198,10 +177,8 @@ int main(int argc, char *argv[])
 	  }
 	  fclose(fp);
 	  /* make the scene */
-          if ( f > 1 && nf[piv[f]] == nf[piv[f-1]])
-	  snprintf(gpname, 34, "Body %d Face %d%d", 1, nf[piv[f]], f);
-          else
-            snprintf(gpname, 34, "Body %d Face %d", 1, nf[piv[f]]);
+
+	  snprintf(gpname, 34, "Body %d Face %d", 1, f);
 	  stat = wv_setData(WV_REAL64, nvert[f], (void *) xyzs,  WV_VERTICES, &items[0]);
 	  if (stat < 0) printf(" wv_setData = %d for %s/item 0!\n", stat, gpname);
 	  wv_adjustVerts(&items[0], focus);

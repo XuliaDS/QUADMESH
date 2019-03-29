@@ -2,6 +2,8 @@
 #include <string.h>
 
 
+
+
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
@@ -9,6 +11,7 @@
 #define AVERAGE   0
 #define ARCLENGTH 1
 #define INVEVAL   2
+
 #define CROSS(a,b,c)  c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
                       c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
                       c[2] = (a[0]*b[1]) - (a[1]*b[0])
@@ -50,8 +53,8 @@ typedef struct {
            totV, sizeV, sizeQ, *vFix, *qIdx, *qAdj,
 	    **valence, *vType, *remQ, *remV, pp, invsteps;
   ego      face;
-  double   minsize, avsize, range[4];
-  double  *xyzs, *uvs, *qArea;
+  double   minsize, avsize, range[4], minAngle, maxAngle;
+  double  *xyzs, *uvs;
 } meshMap;
 
 
@@ -68,9 +71,11 @@ typedef struct{
 } quadGroup;
 
 
-extern int  EG_outLevel(const egObject *object);
+extern int  EG_outLevel(const egObject *object );
 
 extern int  EG_createMeshMap(bodyQuad *bodydata, int uvtype);
-extern int  EG_meshRegularization(meshMap *qm);
+extern int  EG_fullMeshRegularization(meshMap *qm);
 extern int  EG_makeQuadTess(bodyQuad bodydata, ego *quadTess);
-extern void EG_destroyMeshMap(bodyQuad *bodydata);
+extern void EG_destroymeshMap(bodyQuad *bodydata);
+
+

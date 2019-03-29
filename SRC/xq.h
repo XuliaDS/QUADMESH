@@ -51,7 +51,7 @@ typedef struct {
 	    **valence, *vType, *remQ, *remV, pp, invsteps;
   ego      face;
   double   minsize, avsize, range[4];
-  double  *xyzs, *uvs, *qArea;
+  double  *xyzs, *uvs;
 } meshMap;
 
 
