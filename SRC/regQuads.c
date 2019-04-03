@@ -17,7 +17,7 @@
 #include "egads.h"
 #include "regQuads.h"
 
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
 #define REPORT
 #endif
@@ -451,84 +451,6 @@ static double EG_segment(ego face, double *uv1, double *uv2)
 }
 
 
-static int EG_moveDistAway(meshMap *qm, double alpha, int iA, int iB)
-{
-  int    i, it;
-  double seg, uvm[2], uvcopy[4], norm = 0.0, uv0[2], uv1[2], size, dt, segprev;
-
-  if ( qm -> vType[iB -1] != -1 ||
-      inList(qm -> vFix[0], &qm -> vFix[1], iB) >= 0) return EGADS_SUCCESS;
-  uv0[0] = qm -> uvs[2 * (iA - 1)    ];
-  uv0[1] = qm -> uvs[2 * (iA - 1) + 1];
-  uv1[0] = qm -> uvs[2 * (iB - 1)    ];
-  uv1[1] = qm -> uvs[2 * (iB - 1) + 1];
-  seg    = EG_segment(qm -> face, uv0, uv1);
-  if (seg < 0.0) return EGADS_GEOMERR;
-  size   = seg * alpha;
-  if (alpha * seg  < qm -> minsize * 0.25) size = 0.25 * qm -> minsize;
-#ifdef DEBUG
-  printf(" Homotecia AB %d %d %lf --> %lf \n", iA, iB, seg, size);
-  printf("%lf %lf %lf %d \n",
-	 qm -> xyzs[ 3 * ( iA - 1)],qm -> xyzs[ 3 * ( iA - 1) + 1], qm -> xyzs[ 3 * ( iA - 1) + 2], iA);
-  printf("%lf %lf %lf %d \n",
-  	 qm -> xyzs[ 3 * ( iB - 1)],qm -> xyzs[ 3 * ( iB - 1) + 1], qm -> xyzs[ 3 * ( iB - 1) + 2], iB);
-
-#endif
-  uvm   [0] = uv1[0]; uvm   [1] = uv1[1];
-  uvcopy[0] = uv0[0]; uvcopy[1] = uv0[1];
-  uvcopy[2] = uv1[0]; uvcopy[3] = uv1[1];
-  it        = 0;
-  dt        = 0.25;
-  segprev   = seg;
-  while (seg < size) {
-    uvm[0] += (uvcopy[2] - uvcopy[0]) * dt;
-    uvm[1] += (uvcopy[3] - uvcopy[1]) * dt;
-    if (uvm[0] < qm -> range[0] || uvm[0] > qm -> range[1] ||
-        uvm[1] < qm -> range[2] || uvm[1] > qm -> range[3]) return EGADS_SUCCESS;
-    uv1[0] = uvm[0]; uv1[1] = uvm[1];
-    it++;
-    seg    = EG_segment(qm -> face, uv0, uvm);
-    if (it > 100) {
-#ifdef DEBUG
-      printf(" Seg < size Stuck. Break !\n");
-#endif
-      break;
-    }
-    if (fabs(segprev - seg) < size / 10.0) dt += 0.05;
-    segprev = seg;
-  }
-  uvcopy[2] = uv1[0]; uvcopy[3] = uv1[1];
-  it        = 0;
-  while (fabs(seg - size) / size > 0.005) {
-    uvm[0] = (uvcopy[0] + uvcopy[2]) * 0.5;
-    uvm[1] = (uvcopy[1] + uvcopy[3]) * 0.5;
-    seg    = EG_segment(qm -> face, uv0, uvm);
-    i      = 0;
-    if (seg > size) i = 1;
-    uvcopy[2 * i    ] = uvm[0];
-    uvcopy[2 * i + 1] = uvm[1];
-    it++;
-    norm  = (uvcopy[0] - uvcopy[2]) * (uvcopy[0] - uvcopy[2]);
-    norm += (uvcopy[1] - uvcopy[3]) * (uvcopy[1] - uvcopy[3]);
-    if (sqrt(norm) < EPS11 || it > 100) {
-#ifdef DEBUG
-      printf(" POINTS ARE TOO CLOSE TO EACH OTHER: %f it %d  BISECTION DIDN't CONVERGE\n",
-             sqrt(norm), it);
-#endif
-      break;
-    }
-  }
-  updateVertex(qm, iB, uvm);
-#ifdef DEBUG
-  printf("%lf %lf %lf %d \n",
-	 qm -> xyzs[ 3 * ( iA - 1)],qm -> xyzs[ 3 * ( iA - 1) + 1], qm -> xyzs[ 3 * ( iA - 1) + 2], iA);
-  printf("%lf %lf %lf %d \n",
-  	 qm -> xyzs[ 3 * ( iB - 1)],qm -> xyzs[ 3 * ( iB - 1) + 1], qm -> xyzs[ 3 * ( iB - 1) + 2], iB);
-#endif
-  return EGADS_SUCCESS;
-}
-
-
 static void EG_freeStar(vStar **star)
 {
   if ((*star) == NULL) return;
@@ -784,25 +706,27 @@ static int EG_restoreQuads(meshMap *qm, Quad *quad, int nq)
 /*
  * type:  0 = quad , 1 = vertex
  */
-static int EG_centroid(meshMap *qm, int id, double *quv, int type)
+static int EG_centroid(meshMap *qm, int n, int *list, double *quv, int usequv)
 {
-  int i, v, j, n;
-  double xyz0[3], xyz1[3];
+  int i, j = 0;
+  double xyz0[3], xyz1[3], pos[18];
 
-  quv[0] = quv[1] = xyz0[0] = xyz0[1] = xyz0[2] = 0.0;
-  if (type == 0 ) n = 4;
-  else            n = qm -> valence[id - 1][2] + 1;
-  for (j = i = 0; i < n; i++) {
-      if (type == 0)  v = qm ->qIdx[4*(id - 1) + i] - 1;
-      else {
-	  if (i == 0) v = id - 1;
-	  else        v = qm ->valence[id - 1][3 + i - 1] - 1;
-      }
-      xyz0[0] += qm -> xyzs[3 * v    ];
-      xyz0[1] += qm -> xyzs[3 * v + 1];
-      xyz0[2] += qm -> xyzs[3 * v + 2];
-      quv[0]  += qm -> uvs [2 * v    ];
-      quv[1]  += qm -> uvs [2 * v + 1];
+  if (usequv == 1) {
+      i = EG_evaluate(qm -> face, quv, pos);
+      if ( i != EGADS_SUCCESS ) return i;
+      xyz0[0] = pos[0]; xyz0[1] = pos[1]; xyz0[2] = pos[2];
+      j = 1;
+  }
+  else {
+      quv [0] = quv [1] = 0.0;
+      xyz0[0] = xyz0[1] = xyz0[2] = 0.0;
+  }
+  for (i  = 0; i < n; i++) {
+      xyz0[0] += qm -> xyzs[3 * (list[i] - 1)    ];
+      xyz0[1] += qm -> xyzs[3 * (list[i] - 1) + 1];
+      xyz0[2] += qm -> xyzs[3 * (list[i] - 1) + 2];
+      quv[0]  += qm -> uvs [2 * (list[i] - 1)    ];
+      quv[1]  += qm -> uvs [2 * (list[i] - 1) + 1];
       j++;
   }
   xyz0[0] /= (double) j;
@@ -817,6 +741,7 @@ static int EG_centroid(meshMap *qm, int id, double *quv, int type)
   if (i != EGADS_SUCCESS) {
       printf("EG_centroid :: EG_invEvaluate at %lf %lf %lf is %d!!\n ",
 	     xyz0[0], xyz0[1], xyz0[2], i);
+      return i;
   }
   if      (quv[0] < qm -> range[0]) quv[0] = qm -> range[0];
   else if (quv[0] > qm -> range[1]) quv[0] = qm -> range[1];
@@ -869,7 +794,9 @@ static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
   dot1 = centre[3]*centre[3] + centre[4]*centre[4] + centre[5]*centre[5];
   dot2 = centre[6]*centre[6] + centre[7]*centre[7] + centre[8]*centre[8];
   if (dot1 < EPS11 || dot2 < EPS11) {
-      stat = EG_centroid(qm, vC, quv, 1);
+      quv[0] = qm -> uvs[ 2 * (vC - 1)    ];
+      quv[1] = qm -> uvs[ 2 * (vC - 1) + 1];
+      stat = EG_centroid(qm, qm -> valence[vC -1][2], &qm -> valence[vC -1][3], quv, 1);
       if (stat != EGADS_SUCCESS) return stat;
       stat = EG_evaluate(qm -> face, quv, centre);
       if (stat != EGADS_SUCCESS) return stat;
@@ -958,11 +885,11 @@ static int EG_nValenceCount(meshMap *qm, int q, int n)
 }
 
 
-static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, int *order,
-                                   double *theta )
+static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, double *theta )
 {
   int    i, k, k1, k2, stat, vA, vB, vC, area = 0, count = 0, doublet = 0;
   int    qV[4], selfint = 1 ;
+  int piv[6] = {1, 2, 2, 3, 1, 3};
   double projABCD[12], cross[3], qNormal[3], vAB[3], vAC[3], quv[2], xyz[18];
   double norm1, norm2, angle, dot, c, dotNN, dotNP;
 
@@ -984,7 +911,7 @@ static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, int *order,
   norm1 = xyz[3] * xyz[3] + xyz[4] * xyz[4] + xyz[5] * xyz[5];
   norm2 = xyz[6] * xyz[6] + xyz[7] * xyz[7] + xyz[8] * xyz[8];
   if (norm1 < EPS11 || norm2 < EPS11) {
-    stat      = EG_centroid(qm, qID, quv, 0);
+    stat      = EG_centroid(qm, 4, &qm -> qIdx[ 4 * (qID - 1)], quv, 0);
     stat     += EG_evaluate(qm->face, quv, xyz);
     if (stat != EGADS_SUCCESS) {
       printf(" In EG_quadAngleOrientation:: EG_evaluate for quad %d  is %d !!\n",
@@ -1027,26 +954,9 @@ static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, int *order,
       theta[k] = 0.5 * PI;
       doublet  = 1;
     } else {
-      theta[k] = 0.0;
-      for (k1  = 1; k1 < 3; k1++) {
-        vB     = (k + k1    )%4;
-        vC     = (k + k1 + 1)%4;
-        /*vAB[0] = qm -> xyzs[3 * qV[vB]    ] - qm -> xyzs[3 * qV[vA]    ];
-        vAB[1] = qm -> xyzs[3 * qV[vB] + 1] - qm -> xyzs[3 * qV[vA] + 1];
-        vAB[2] = qm -> xyzs[3 * qV[vB] + 2] - qm -> xyzs[3 * qV[vA] + 2];
-        vAC[0] = qm -> xyzs[3 * qV[vC]    ] - qm -> xyzs[3 * qV[vA]    ];
-        vAC[1] = qm -> xyzs[3 * qV[vC] + 1] - qm -> xyzs[3 * qV[vA] + 1];
-        vAC[2] = qm -> xyzs[3 * qV[vC] + 2] - qm -> xyzs[3 * qV[vA] + 2];
-        vAB[0] = projABCD[3 * vB    ] - projABCD[3 * vA    ];
-        vAB[1] = projABCD[3 * vB + 1] - projABCD[3 * vA + 1];
-        vAB[2] = projABCD[3 * vB + 2] - projABCD[3 * vA + 2];
-        vAC[0] = projABCD[3 * vC    ] - projABCD[3 * vA    ];
-        vAC[1] = projABCD[3 * vC + 1] - projABCD[3 * vA + 1];
-        vAC[2] = projABCD[3 * vC + 2] - projABCD[3 * vA + 2];
-
-        CROSS(vAB, vAC, cross);
-        //printf(" %d %d %d ---> %.16f \n ", qV[vA]+1, qV[vB] + 1, qV[vC] + 1 , size );
-         */
+      for (k1  = 0; k1 <= 2; k1++) {
+        vB     = (k + piv[2 * k1    ])%4;
+        vC     = (k + piv[2 * k1 + 1])%4;
         vAB[0] = projABCD[3 * vB    ] - projABCD[3 * vA    ];
         vAB[1] = projABCD[3 * vB + 1] - projABCD[3 * vA + 1];
         vAB[2] = projABCD[3 * vB + 2] - projABCD[3 * vA + 2];
@@ -1065,36 +975,27 @@ static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, int *order,
           angle  = (2.0 * PI - angle);
           ori[k] = -1;
         }
-        theta[k] += angle;
+        if ( k1 == 2 ) theta[k] = angle;
       }
     }
-    order[k]      = k;
-    if (ori[k]   == 1) selfint   = 0;
-    if (ori[k] == 1 && theta[k] < PI + 1.e-08) count++;
-    if (k == 0 ) continue;
-    for (i = k -1 ; i >= 0; i-- ) {
-	if (theta[order[k]] < theta[order[i]]) continue;
-	k2       = order[i];
-	order[i] = order[k];
-	order[k] = k2;
-    }
+    if (ori[k] == -1) continue;
+    selfint = 0;
+    if (theta[k] < PI + 1.e-08) count++;
   }
-  if      (count   == 4 || ( selfint == 0 && doublet == 1 )) {
-   //   printf(" count %d self int %d doublet %d\n ", count, selfint, doublet);
-      area = 1;
-  }
-  else if (selfint == 0) area = 2;
-  else                   area = 0;
+  if (   count == 4 ||
+      (selfint == 0 && doublet == 1 )) area = 1;
+  else if (selfint == 0)               area = 2;
+  else                                 area = 0;
 #ifdef DEBUG
   if (area != 1 ) {
       if ( area == 2 )
 	printf(" ************ ATENCION QUAD %d DEGENERATED QUAD ( AREA 2 )       ***************\n", qID);
       else
 	printf(" ************ ATENCION QUAD %d SELFINTERSECTING QUAD ( AREA 0 )   ***************\n", qID);
-      printf("------------    Internal angles ordered by size --------------\n");
+      printf("------------    Internal angles --------------\n");
       for (k = 0; k < 4; ++k)
 	printf("Vertex %d has angle %f and orientation %d \n ",
-	       qV[order[k]] + 1, theta[order[k]], ori[order[k]]);
+	       qV[k] + 1, theta[k], ori[k]);
       //printQuad(qm , qID);
       for (k = 0; k < 4; ++k)
 	printf("%lf %lf %lf %d\n ", projABCD[3 * k], projABCD[3 * k + 1], projABCD[3 * k + 2], qV[k] + 1);
@@ -1106,149 +1007,142 @@ static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, int *order,
 }
 
 
-static void EG_computeCoords(meshMap *qm, int vID, /*@null@*/ int *areas)
+static void EG_computeCoords(meshMap *qm, int vID )
 {
-  int    vA, vB, vC, i, j, k, auxID = 0, stat, i0, bdry = 0, n = 0;
+  int    vA, vB, vC, i, j, k, kk, auxID = 0, stat, i0, n = 0;
   int    *verts = NULL, piv[4], ori[4];
-  double uvc[2], angle, angles[4], totarc, arc, uva[2];
+  double uvc[2], angles[4], totarc, arc, uva[2];
   vStar  *star = NULL;
 
-  if (qm->vType[ vID -1] != -1 ||
-      inList(qm->vFix[0], &qm->vFix[1], vID) >= 0) {
+  if (qm->vType[ vID -1] != -1 ) {
 #ifdef DEBUG
-    printf(" VERTEX %d is fix !\n ", vID);
+      printf(" VERTEX %d is fix !\n ", vID);
 #endif
-    return;
+      return;
   }
-  
+
 #ifdef DEBUG
   printf(" AVERAGE COORDS FOR VERTEX %d \n ", vID);
   printVertex(qm, vID);
 #endif
   if (qm->valence[vID - 1][2] == 2) {
-    vA     = qm -> valence[vID -1][3] - 1;
-    vB     = qm -> valence[vID -1][4] - 1;
-    uva[0] = 0.5 * (qm -> uvs[2 * vA    ] + qm -> uvs[2 * vB    ]);
-    uva[1] = 0.5 * (qm -> uvs[2 * vA + 1] + qm -> uvs[2 * vB + 1]);
-    updateVertex(qm, vID, uva);
+      vA     = qm -> valence[vID -1][3] - 1;
+      vB     = qm -> valence[vID -1][4] - 1;
+      uva[0] = 0.5 * (qm -> uvs[2 * vA    ] + qm -> uvs[2 * vB    ]);
+      uva[1] = 0.5 * (qm -> uvs[2 * vA + 1] + qm -> uvs[2 * vB + 1]);
+      updateVertex(qm, vID, uva);
 #ifdef DEBUG
-    printf(" LEAVE WITH COORDS\n");
-    printVertex(qm, vID);
+      printf(" LEAVE WITH COORDS\n");
+      printVertex(qm, vID);
 #endif
-    return;
+      return;
   }
-  stat  = EG_buildStar(qm, &star, vID);
-  if (star == NULL || stat != EGADS_SUCCESS) return;
-  verts = EG_alloc(star -> nQ * sizeof(int));
-  if (verts == NULL) return;
-  for (k = i = 0; i < star -> nQ; i++) {
-    if (areas == NULL)
-         j = EG_quadAngleOrientation(qm, star -> quads[i], ori, piv, angles);
-    else j = areas[i];
-#ifdef DEBUG
-    printf(" star centre %d quad %d is %d \n ", vID, star -> quads[i], j );
-#endif
-    if (j    <= 0) continue;
-    vA        = star -> verts[             2 * i + 1];
-    vB        = star -> verts[star -> idxV[2 * i + 3]];
-    stat      = EG_angleAtVnormalPlane(qm, vID, vA, vB, &angle);
-    if (stat != EGADS_SUCCESS) {
-      printf(" Angle At normal plane %f -> %d \n ",angle, stat );
-      continue;
-    }
-#ifdef DEBUG
-    printf(" Quad %d angle at normal plane %f ( %d %d %d ) \n ",
-           star -> quads[i], angle, vID, vA, vB);
-#endif
-    if      (angle > PI  ) k =  1;
-    else if (angle < DEG5) k = -1;
-    else continue;
-#ifdef DEBUG
-    printf(" ANGLE %lf MIN MAX %lf %lf \n ", angle, PI, DEG5);
-#endif
-    for (n = j = 0; j < star -> nQ; j++) {
-      auxID  = star -> verts [2 * j + 1 ] - 1;
-      if ((k ==  1 && (auxID + 1 == vA || auxID + 1 == vB)) ||
-          (k == -1 &&  auxID + 1 != vA && auxID + 1 != vB)) continue;
-      verts[n++] = auxID;
-      break;
-    }
-  }
+  stat      = EG_buildStar(qm, &star, vID);
+  if (star  == NULL || stat != EGADS_SUCCESS) return;
+  verts     = EG_alloc(star -> nQ * sizeof(int));
   vA = qm -> valence[vID - 1][3] -1;
   vB = qm -> valence[vID - 1][4] -1;
   vC = qm -> valence[vID - 1][5] -1;
-  if (k == 0               && qm -> vType[vC] == -1 &&
-      (qm -> vType[vA] > 0 && qm -> vType[vA]  < 4) &&
-      (qm -> vType[vB] > 0 && qm -> vType[vB]  < 4)) {
-    for (j = i0 = k = 0; k < star -> nQ; k++) {
-      auxID = star -> verts[2 * k + 1] - 1;
-      if (qm -> vType[auxID] > 0) {
-        if (i0 == 0) i0 = 2 * k + 1;
-        else {
-          j = 2 * k + 1;
-          if (j - i0 > 2 && (i0 + (star -> nV - 1) - j != 2)) {
-            i0 = star -> nV;
-            break;
-          }
-        }
-      } else if ( qm -> valence[auxID][2] == 2 ) {
-	  i0 = 0;
-	  break;
+  if (qm -> vType[vC] == -1 && qm -> vType[vA] > 0 &&
+      qm -> vType[vA]   < 4 && qm -> vType[vB] > 0 && qm -> vType[vB] < 4) {
+      for (j = i0 = k = 0; k < star -> nQ; k++) {
+	  auxID = star -> verts[2 * k + 1] - 1;
+	  if (qm -> vType[auxID] > 0) {
+	      if (i0 == 0) i0 = 2 * k + 1;
+	      else {
+		  j = 2 * k + 1;
+		  if (j - i0 > 2 && (i0 + (star -> nV - 1) - j != 2)) {
+		      i0 = star -> nV;
+		      break;
+		  }
+	      }
+	  } else if ( qm -> valence[auxID][2] == 2 ) {
+	      i0 = 0;
+	      break;
+	  }
       }
-    }
-    k = 0 ;
-    if (i0 == star -> nV) {
-      verts[0] = vA + 1;
-      verts[1] = vB + 1;
-      n        = 2;
-      uva[0]   = 0.5 * ( qm -> uvs[2 * vA    ] + qm -> uvs[2 * vB    ] );
-      uva[1]   = 0.5 * ( qm -> uvs[2 * vA + 1] + qm -> uvs[2 * vB + 1] );
-      bdry     = 1;
-    }
+      if (i0 == star -> nV) {
+#ifdef DEBUG
+	  printf(" MID POINTS BETWEENM BOUNDS \n ");
+#endif
+	  uva[0] = 0.5 * ( qm -> uvs[2 * vA    ] + qm -> uvs[2 * vB    ] );
+	  uva[1] = 0.5 * ( qm -> uvs[2 * vA + 1] + qm -> uvs[2 * vB + 1] );
+	  uvc[0] = qm -> uvs[ 2* ( vID - 1)   ];
+	  uvc[1] = qm -> uvs[ 2* ( vID - 1)+ 1];
+	  updateVertex (qm, vID, uva);
+	  for (k = i = 0; i < star -> nQ; i++) {
+	      j  = EG_quadAngleOrientation(qm, star -> quads[i], ori,  angles);
+	      for ( kk = 0 ; kk < 4; kk++ ) {
+		  if ( qm -> vType[qm -> qIdx[ 4 * (star -> quads[i] - 1) + kk] - 1] > 0 ) {
+		      kk = 10;
+		      break;
+		    }
+	      }
+	      if (j == 0 || (j == 2 && kk == 10)  ) {
+		  k = 1 ;
+		  break;
+	      }
+	  }
+	  if ( k == 0 ) {
+	      EG_freeStar(&star);
+	      EG_free(verts);
+	      return;
+	  }
+	  updateVertex (qm, vID, uvc);
+      }
   }
-  if (k == 0 && bdry == 0) {
-    for (n = j = 0; j < star -> nQ; j++) {
-	verts[n] = star -> verts[2 * j + 1] - 1;
-	if (qm -> vType  [verts[n]]    == -1 &&
-	    qm -> valence[verts[n]][2] == 2 ) continue;
-	n++;
-    }
+  for (n = j = 0; j < star -> nQ; j++) {
+      verts[n] = star -> verts[2 * j + 1];
+      if (qm -> vType  [verts[n] - 1]    == -1 &&
+	  qm -> valence[verts[n] - 1][2] == 2 ) continue;
+      n++;
   }
   EG_freeStar(&star);
-  if (bdry != 1) {
-    if (qm -> uvtype == INVEVAL && EG_centroid(qm, vID, uva, 1) != EGADS_SUCCESS) {
-      EG_free(verts);
-      return;
-    } else {
+  if (qm -> uvtype == INVEVAL ) {
+      uva[0] = qm -> uvs[2 * ( vID -1 )    ];
+      uva[1] = qm -> uvs[2 * ( vID -1 ) + 1];
+      if (EG_centroid(qm, n, verts, uva, 1) != EGADS_SUCCESS ) {
+	  EG_free(verts);
+	  return;
+      }
+      if ( n == 1 ) {
+	  uva[0] = 0.5 * (qm -> uvs[2 * ( vID -1 )    ] + uva[0]);
+	  uva[1] = 0.5 * (qm -> uvs[2 * ( vID -1 ) + 1] + uva[1]);
+      }
+  } else {
       if (n == 0) {
-        EG_free(verts);
-        return;
+	  EG_free(verts);
+	  return;
       }
       totarc = 0.0;
       uva[0] = qm -> uvs[2 * (vID - 1)    ];
       uva[1] = qm -> uvs[2 * (vID - 1) + 1];
       uvc[0] = uvc[1] = 0.0;
       for (j = 0; j < n; j++) {
-        arc  = EG_segment(qm->face, &qm ->uvs[2 * (vID - 1)],
-                          &qm ->uvs[2 * verts[j]]);
-        totarc += arc;
-        uvc[0] += arc * qm -> uvs[2 * verts[j]    ];
-        uvc[1] += arc * qm -> uvs[2 * verts[j] + 1];
-        uva[0] +=       qm -> uvs[2 * verts[j]    ];
-        uva[1] +=       qm -> uvs[2 * verts[j] + 1];
+	  arc  = EG_segment(qm->face, &qm ->uvs[2 * (vID - 1)],
+			    &qm ->uvs[2 * (verts[j] - 1)]);
+	  totarc += arc;
+	  uvc[0] += arc * qm -> uvs[2 * (verts[j] - 1)    ];
+	  uvc[1] += arc * qm -> uvs[2 * (verts[j] - 1) + 1];
+	  uva[0] +=       qm -> uvs[2 * (verts[j] - 1)    ];
+	  uva[1] +=       qm -> uvs[2 * (verts[j] - 1) + 1];
       }
       uva[0] /= (double) (n + 1);
       uva[1] /= (double) (n + 1);
       if (qm -> uvtype == ARCLENGTH && n > 1) {
-        uva[0] = uvc[0] / totarc;
-        uva[1] = uvc[1] / totarc;
+	  uva[0] = uvc[0] / totarc;
+	  uva[1] = uvc[1] / totarc;
       }
-    }
   }
   EG_free(verts);
   if (uva[0] >= qm -> range[0] && uva[0] <= qm -> range[1] &&
-      uva[1] >= qm -> range[2] && uva[1] <= qm -> range[3])
-    updateVertex(qm, vID, uva);
+      uva[1] >= qm -> range[2] && uva[1] <= qm -> range[3]) {
+     if (n > 5 ) {
+	 uva[0] = 0.5 * (qm -> uvs[2 * ( vID -1 )    ] + uva[0] );
+	 uva[1] = 0.5 * (qm -> uvs[2 * ( vID -1 ) + 1] + uva[1] );
+     }
+     updateVertex(qm, vID, uva);
+  }
 #ifdef DEBUG
   printf(" LEAVE WITH COORDS\n");
   printVertex(qm, vID);
@@ -1470,459 +1364,23 @@ int EG_createMeshMap(bodyQuad *bodydata, int uvtype)
   return stat2;
 }
 
-static int COUNT = 0;
-
-/* clockwise = -1 , counterclockwise = 1
- * reverse = 0 assumes invalid quads e.g., ( AB x AC ) * normal < 0 so rotated B towards C (clockwise ) and
- * C towards B ( counterclockwise).if <ABC is small, it will increase the angle.
- * reverse = 1 assumes <ABC is big and will move B counter-clockwise and C clockwise
- */
-static void rotationUV(meshMap *qm, double *theta, int counterClockWise,
-                       double *t0, double *t1, int *ncall )
-{
-  int    d, stat, selfcall;
-  double normal[4], proj[3], cross[4], xyz1[18], dt, duv[2], xyz0[18];
-  double prevt[2], v1[3], v2[3], norm1, norm2, angle, dot;
-  
-  stat      = EG_evaluate(qm -> face, t0, xyz0);
-  if (stat != EGADS_SUCCESS) {
-#ifdef DEBUG
-    printf("EG_rotationUV :: EG_normalToSurface ->%d!!\n",  stat);
-#endif
-    return;
-  }
-  norm1 = xyz0[3] * xyz0[3] + xyz0[4] * xyz0[4] + xyz0[5] * xyz0[5];
-  norm2 = xyz0[6] * xyz0[6] + xyz0[7] * xyz0[7] + xyz0[8] * xyz0[8];
-  v1[0] = xyz0[3]; v1[1] = xyz0[4]; v1[2] = xyz0[5];
-  v2[0] = xyz0[6]; v2[1] = xyz0[7]; v2[2] = xyz0[8];
-  if (norm1 < EPS11 || norm2 < EPS11) return;
-  if (qm -> face -> mtype == SREVERSE) {
-    CROSS(v2, v1, normal);
-  } else {
-    CROSS(v1, v2, normal);
-  }
-  prevt[0]  = t1[0]; prevt[1]  = t1[1];
-  stat     += EG_evaluate(qm -> face, t1, xyz1);
-  if (stat != EGADS_SUCCESS) {
-#ifdef DEBUG
-    printf(" RotationUV rotation vector has EG_evaluate %d!!\n", stat);
-#endif
-    return;
-  }/*
-  stat      = EG_projectToTangentPlane(normal, xyz0, xyz1, proj);
-  if (stat != EGADS_SUCCESS) {
-#ifdef DEBUG
-    printf("EG_rotateUV :: EG_projectToTangentPlane %d !!\n", stat);
-#endif
-    return;
-  }
-  v1[0]    = proj[0] - xyz0[0];
-  v1[1]    = proj[1] - xyz0[1];
-  v1[2]    = proj[2] - xyz0[2];*/
-  v1[0] = xyz1[0] - xyz0[0];
-  v1[1] = xyz1[1] - xyz0[1];
-  v1[2] = xyz1[2] - xyz0[2];
-  printf("%lf %lf %lf %d\n ", xyz1[0], xyz1[1], xyz1[2], 0);
-  dt = 0.0001;
-  for (selfcall = d = 0; d <= 2; d++) {
-      if ( d == 1 ) dt *= -1.0;
-      printf(" dt %lf NCALL %d d %d\n ", dt, *ncall, d );
-    duv[0] = (prevt[0] - t0[0]) * cos(dt) - (prevt[1] - t0[1]) * sin(dt);
-    duv[1] = (prevt[0] - t0[0]) * sin(dt) + (prevt[1] - t0[1]) * cos(dt);
-    t1[0]  = t0[0]     + duv[0];
-    t1[1]  = t0[1]     + duv[1];
-    if (t1[0] < qm ->range[0] || t1[0] > qm ->range[1] ||
-        t1[1] < qm ->range[2] || t1[1] > qm ->range[3]) {
-	printf(" OUT OF RANGE DT %lf !!! \n", dt );
-	printf(" %lf %lf --> %lf %lf %lf %lf\n ",
-	       t1[0], t1[1], qm -> range[0], qm -> range[1],
-	       qm -> range[2], qm -> range[3] );
-	if (d == 2) {
-	    selfcall++;
-	    d--;
-	    dt = 0.5 * dt;
-	    if (selfcall >= 5 ) return;
-	}
-	continue;
-    }
-    stat      = EG_evaluate(qm -> face, t1, xyz1);
-    if (stat != EGADS_SUCCESS) {
-	printf(" stat %d OUT OF RANGE !!! \n" , stat);
-	printf(" %lf %lf --> %lf %lf %lf %lf\n ",
-	       t1[0], t1[1], qm -> range[0], qm -> range[1],
-	       qm -> range[2], qm -> range[3] );
-	printf(" DT %lf  \n ", dt );
-	if (d == 2) {
-	    selfcall++;
-	    d--;
-	    dt = 0.5 * dt;
-	    if (selfcall >= 5 ) return;
-	}
-	continue;
-    }
-    /*stat      = EG_projectToTangentPlane(normal, xyz0, xyz1, proj);
-    printf("%lf %lf %lf %d\n ", proj[0], proj[1], proj[2], d + 1);
-    printf("%lf %lf %lf %d\n ", xyz1[0], xyz1[1], xyz1[2], d + 1);
-    if (stat != EGADS_SUCCESS) {
-#ifdef DEBUG
-      printf("EG_rotateUV :: EG_projectToTangentPlane %d !!\n", stat);
-#endif
-      t1[0] = prevt[0]; t1[1] = prevt[1];
-      return;
-    }
-    v2[0] = proj[0] - xyz0[0];
-    v2[1] = proj[1] - xyz0[1];
-    v2[2] = proj[2] - xyz0[2];*/
-    printf("%lf %lf %lf %d\n ", xyz1[0], xyz1[1], xyz1[2], d + 1);
-    v2[0] = xyz1[0] - xyz0[0];
-    v2[1] = xyz1[1] - xyz0[1];
-    v2[2] = xyz1[2] - xyz0[2];
-    CROSS(v1, v2, cross);
-    norm1 = DOT(v1, v1);
-    norm2 = DOT(v2, v2);
-    dot   = DOT(v1, v2 ) / sqrt(norm1 * norm2 );
-    if      (dot >=  1.0) angle = 0.0;
-    else if (dot <= -1.0) angle = PI;
-    else                  angle = acos(dot);
-    printf(" NORM ORI %.16f  NO NORM %.16f \n ", norm1, norm2 );
-    printf(" DOT %.12f  counter %d > 0 \n ", DOT (normal, cross), counterClockWise );
-    dot =  DOT(normal, cross) * (double) counterClockWise;
-    printf(" PRODUCT %.16f SIGN %d\n ", dot, signbit (dot ) );
-    if ( signbit(dot) == 0 ) {
-	printf(" ENTER IF  %d  \n ", d);
-	if ( d != 2 ) {
-	    dt = *theta;
-	    if (d == 1) dt *= -1.0;
-	    else d++;
-	    printf(" NOW RUN WITH %lf \n ", dt );
-	    continue;
-	}
-#ifdef DEBUG
-	printf(" NORMLA %lf %lf %lf \n ", normal[0], normal[1], normal[2] );
-	printf(" CROSS %.16f %.16f %.16f \n ", cross[0], cross[1], cross[2] );
-	printf(" DOT %.16f sing %d > 0 \n", DOT(normal, cross), counterClockWise);
-	printf(" angle %.16f  dt %lf theta %lf \n ", angle, dt , *theta);
-#endif
-	(*ncall)++;
-	if (*ncall >= 5 || (angle > 1.e-04 && angle <= *theta ) || *theta < 1.e-04 ) {
-	    printf(" GOOD STUFF !\n ");
-	    return;
-	}
-
-	if ( angle > 1.e-04 ) *theta *= 0.5;
-	else                  *theta *= 2.0;
-	t1[0]   = prevt[0]; t1[1] = prevt[1];
-	printf(" CALL AGAIN WITH %lf  ncall %d\n ", *theta, *ncall);
-	rotationUV(qm, &(*theta), counterClockWise, t0, t1, &(*ncall));
-    } else {
-	if (d == 2) {
-	    printf(" I FOUND NOWHERE TO GO! \n ");
-	    t1[0] = prevt[0]; t1[1] = prevt[1];
-	    return;
-	}
-    }
-  }
-}
-
-
-static void EG_3Drotation(meshMap *qm, double minT, double maxT, double theta,
-                          int iA, int iB, int iC)
-{
-  int    i, a, v,  area, counterClockWise = 1, stat, fix = 0, reverse = 0, callcount = 0;
-  int    piv[4], ori[4], links[2];
-  double ang0, ang1, angles[4], uvf[2], angle ;
-  vStar  *star = NULL;
-
-  stat = EG_angleAtVnormalPlane(qm, iA, iB, iC, &angle );
-#ifdef DEBUG
-  printf(" LOOKING AT ANGLE %d (%d) %d  (%d) %d (%d)  --> %lf   MIN MAX %lf  %lf  \n ",
-         iA, qm -> vType[iA-1],  iB, qm -> vType[iB-1],
-	 iC, qm -> vType[iC-1], angle, minT, maxT);
-#endif
-  if (stat != EGADS_SUCCESS) return;
-  if (angle > maxT) {
-    if (qm -> vType[iA - 1] >= 0) {
-      i     = EG_angleAtBoundaryVertex(qm, iA,       links,  &ang0);
-      stat  = EG_angleAtVnormalPlane  (qm, iA, links[0], iB, &ang0);
-      stat += EG_angleAtVnormalPlane  (qm, iA, links[0], iC, &ang1);
-      if (stat != EGADS_SUCCESS) return;
-      if (ang0 < ang1 || links[0] == iC) reverse = 1;
-    } else if (angle < 1.5 * PI) reverse = 1;
-  }
-  else if (angle >= minT) return;
-  ang0 = EG_segment( qm -> face, &qm -> uvs[2 * (iA - 1)],
-                    &qm -> uvs[2 * (iB - 1)]);
-  ang1 = EG_segment( qm -> face, &qm -> uvs[2 * (iA - 1)],
-                    &qm -> uvs[2 * (iC - 1)]);
-  if (     ang0 > ang1 && ang1 / ang0 < 0.95) {
-      EG_moveDistAway(qm, 0.95, iA, iB);
-#ifdef DEBUG
-      printf("%lf %lf %lf %d\n ",
-	     qm -> xyzs [3 * ( iB - 1)],qm -> xyzs [3 * ( iB - 1)+1], qm -> xyzs [3 * ( iB - 1)+2], iB);
-#endif
-  }
-  else if (ang0 < ang1 && ang0 / ang1 < 0.95) {
-      EG_moveDistAway(qm, 0.95, iA, iC);
-#ifdef DEBUG
-      printf("%lf %lf %lf %d\n ",
-      	     qm -> xyzs [3 * ( iC - 1)],qm -> xyzs [3 * ( iC - 1)+1], qm -> xyzs [3 * ( iC - 1)+2], iC);
-#endif
-  }
-  if (reverse == 1) counterClockWise *= -1;
-  for (a = 0; a < 2; a++) {
-    counterClockWise *= -1;
-    if (a == 0) v = iB - 1;
-    else        v = iC - 1;
-    fix = 0;
-    if (qm -> vType[v] != -1) continue;
-    if (inList(qm -> vFix[0], &qm -> vFix[1], v + 1) >= 0) {
-      stat      = EG_buildStar(qm, &star, v + 1);
-      if (stat != EGADS_SUCCESS || star == NULL) return;
-      fix       = 1;
-      uvf[0]    = qm -> uvs[2 * v    ];
-      uvf[1]    = qm -> uvs[2 * v + 1];
-      for (i    = 0; i < star -> nQ; i++) {
-        star->verts[i] = EG_quadAngleOrientation(qm, star->quads[i], ori,
-						 piv, angles);
-#ifdef DEBUG
-        printf(" i %d -> %d AReA %d \n ",
-               i, star -> quads[i], star -> verts[i]);
-#endif
-      }
-    }
-#ifdef DEBUG
-    printf(" ROTATE %d  %d   %d \n ", iA, v + 1, counterClockWise);
-    printVertex(qm, v + 1 ) ;
-#endif
-    COUNT = 0;
-    rotationUV(qm, &theta, counterClockWise, &qm -> uvs[2 * (iA - 1)],
-               &qm -> uvs[2 * v], &callcount);
-    updateVertex(qm, v + 1, &qm -> uvs[2 * v]);
-#ifdef DEBUG
-    printVertex(qm, v + 1 ) ;
-#endif
-    if (fix == 1 && star != NULL) {
-      for (i = 0; i < star -> nQ; i++) {
-        area = EG_quadAngleOrientation(qm, star -> quads[i], ori, piv, angles);
-        if (area < 0 || (area == 0 && star -> verts[i] > 0)) {
-#ifdef DEBUG
-          printf (" ROTATED COOORDS MAKE INVALID QUAD \n ");
-          printVertex(qm, v + 1);
-#endif
-          updateVertex(qm, v + 1, uvf);
-          break;
-        }
-      }
-      EG_freeStar(&star);
-    }
-  }
-}
-
-
-static int EG_makePositiveAngles(meshMap *qm, double minAngle, double maxAngle,
-				 int qID, int smooth )
-{
-  int    i, j, k, kk, iO, iA, iB, it , itMAX = 50, i0, area = 0;
-  int    ori[8], piv[8], quad[4], type[4], vfix[4], *sa = NULL, boundlink[4];
-  double ang, angles[8], dt = 0.01, ds = 0.95, xyzA[3], xyzB[3] ;
-  double dista, distb, maxT, minT, uv[2], totDist = 0.0;
-  vStar  *star = NULL;
-  static int pivTri[6] = { 1, 2, 2, 3, 1, 3 };
-
-  for (j = 0; j < 4; j++) {
-      quad[j] = qm -> qIdx[4 * (qID - 1) + j];
-      type[j] = qm -> vType[quad[j] - 1];
-      vfix[j] = 0;
-      if (qm -> valence[quad[j] - 1][2] == 2 && type[j] == -1) return 1;
-      if (type[j] > 0 ||
-	  qm -> vType[qm -> valence[ quad[j] -1 ][3] -1] != -1 ) boundlink[j] = 1;
-      else boundlink[j] = 0;
-  }
-#ifdef DEBUG
-  printf("makePositiveAngle for quad %d \n ", qID);
-  gnuData(qm, NULL);
-#endif
-  for (it  = 0; it < itMAX; it++) {
-      area   = EG_quadAngleOrientation(qm, qID, ori, piv, angles);
-      for (i = 0 ; i < 4 ; i++ )
-	if (ori[i] == -1 && boundlink[i] == 1) area = 0;
-      for (j = 0; j < 4; j++) {
-	  printf(" PIV %d - %d \n ", piv[j], quad[piv[j]] );
-	  if (type[piv[j]] != -1 || vfix[piv[j]]  == 1 ||
-	      inList(qm->vFix[0], &qm->vFix[1], quad[piv[j]]) != -1 ) {
-#ifdef DEBUG
-	      printf(" V %d type %d vix %d \n ", j, type[piv[j]], vfix[piv[j]]);
-#endif
-	      continue;
-	  }
-	  k      = quad[piv[j]] - 1;
-	  uv[0]  = qm -> uvs[2 * k    ];
-	  uv[1]  = qm -> uvs[2 * k + 1];
-	  i      = EG_buildStar(qm, &star, k + 1);
-	  if (i != EGADS_SUCCESS || star == NULL) return EGADS_MALLOC;
-	  sa     = EG_alloc(star -> nQ * sizeof(int));
-	  if (sa == NULL) {
-	      EG_freeStar(&star);
-	      return EGADS_MALLOC;
-	  }
-	  for (i  = 0; i < star -> nQ; i++) {
-	      sa[i] = EG_quadAngleOrientation(qm, star->quads[i], &ori[4],
-					      &piv[4], &angles[4]);
-	  }
-	  EG_computeCoords(qm, k + 1, sa);
-	  for (i = 0; i < star -> nQ; i++) {
-	      area = EG_quadAngleOrientation(qm, star->quads[i], &ori[4],
-					     &piv[4], &angles[4]);
-	      if ((area == 0 && sa[i] != 0) ||
-		  (area == 2 && sa[i] == 1)) {
-#ifdef DEBUG
-		  printf(" At vertex %d !! invalid area quad %d -> %d\n ",
-			 k + 1, star -> quads[i], area);
-		  printf(" RESET COORDS %d \n ", k + 1);
-		  printQuad(qm, star -> quads[i]);
-#endif
-		  updateVertex(qm, k + 1, uv);
-#ifdef DEBUG
-		  printQuad(qm, star -> quads[i]);
-#endif
-		  break;
-	      }
-	  }
-	  EG_freeStar(&star);
-	  EG_free(sa);
-      }
-      area = EG_quadAngleOrientation(qm, qID, ori, piv, angles);
-      for (j = i = 0; i < 4; i++) {
-	  if      (angles[i] >= minAngle && angles[i] <= maxAngle) j++;
-	  else if (type[i] == -1 && qm -> valence [quad[i]-1 ][2] != 4 &&
-	            ori[i]  == 1 )  j++;
-	  if ( ori[i] == -1 && boundlink[i] == 1 ) area = 0;
-      }
-      if (smooth == 1 && j == 4 ) area = 1;
-      if (area   == 1 ||
-	  (area  == 2 && qm -> pp == 1 ) ) {
-	  area = 1;
-	  break;
-      }
-      break;
-#ifdef DEBUG
-      printf(" it %d area %d min %f max %f\n", it, area,  minAngle, maxAngle);
-#endif
-      for (i0 = j = 0; j < 4; j++) {
-	  if (type  [piv[j]] >= 0 && (type[piv[i0]] == -1 ||
-	      angles[piv[j]] > angles[piv[i0]])) i0 = j;
-      }
-#ifdef DEBUG
-      printQuad(qm, qID);
-#endif
-      for (j = 0; j < 4; j++) piv[j] = (piv[i0] + j)%4;
-#ifdef DEBUG
-      if (it%5 == 0) gnuData(qm, NULL);
-#endif
-      totDist = 0.0;
-      for (j  = 0; j < 4; j++) {
-	  iO  = piv[j];
-	  if (type[iO] == -1 && ori[iO] == -1 &&
-	      qm -> vType[qm -> valence[quad[iO] - 1][3] - 1] == -1) continue;
-#ifdef DEBUG
-	  printf ("=========== O ( %d ) = %d ::: ANGLE %lf MAX ANGLE PASS %f %f   ==============================\n",
-		  iO, quad[iO], angles[iO], minAngle, maxAngle);
-#endif
-	  if ( type[i0] >= 4 ||
-	      (type[iO] == -1 && qm -> valence[quad[iO] - 1][2] != 4)) {
-	      maxT = PI;
-	      minT = 0.0;
-	  }
-	  else {
-	      maxT = maxAngle;
-	      minT = minAngle;
-	  }
-	  for (i = 0; i < 3; i++) {
-	      iA = (iO + pivTri[2 * i    ])%4;
-	      iB = (iO + pivTri[2 * i + 1])%4;
-	      for (kk = 0; kk < 3; kk ++) {
-		  xyzA[kk] = qm -> xyzs[3 * (quad[iA] - 1) + kk];
-		  xyzB[kk] = qm -> xyzs[3 * (quad[iB] - 1) + kk];
-	      }
-#ifdef DEBUG
-	      printQuad(qm, qID);
-#endif
-	      EG_3Drotation(qm, minT, maxT, dt, quad[iO], quad[iA], quad[iB]);
-	      dista = 0.0; distb = 0.0;
-	      if (EG_angleAtVnormalPlane(qm, quad[iO], quad[iA], quad[iB],
-					 &ang) != EGADS_SUCCESS) continue;
-	      for (kk = 0; kk < 3; kk++) {
-		  dista += (xyzA[kk] - qm -> xyzs[3 * (quad[iA] - 1) + kk]) *
-		           (xyzA[kk] - qm -> xyzs[3 * (quad[iA] - 1) + kk]);
-		  distb += (xyzB[kk] - qm -> xyzs[3 * (quad[iB] - 1) + kk]) *
-		           (xyzB[kk] - qm -> xyzs[3 * (quad[iB] - 1) + kk]);
-	      }
-	      dista = sqrt(dista);
-	      distb = sqrt(distb);
-	      if (dista + distb > 0.0 && dista < 0.1 * qm -> minsize &&
-		  distb < 0.1 * qm -> minsize) {
-		  dt += 0.01;
-		  ds -= 0.01;
-	      }
-#ifdef DEBUG
-	      printf("it %d --> dt %f ds %f distances %f  %f\n",
-		     it, dt, ds, dista, distb);
-	      printf("Angle i %d -> %d %d %d is now %f  \n ",
-		     i, quad[iO], quad[iA], quad[iB], ang);
-	      printQuad(qm, qID);
-#endif
-	      totDist += dista + distb;
-	      if ((ang > maxT || ang < minT) && dista + distb > 0.0) {
-		  gnuData(qm, NULL);
-		  if (it == 0) {
-		      if (dista > 0.0) vfix[iA] = 1;
-		      if (distb > 0.0) vfix[iB] = 1;
-#ifdef DEBUG
-		      printf(" --------- ATTENTION IN QUAD %d fixing angles %d = %d  %d = %d \n ",
-			     qID, iA, quad[iA], iB, quad[iB]);
-#endif
-    }
-    break;
-	      }
-	  }
-	  if ((ang > maxT || ang < minT) && dista + distb > 0.0) break;
-      }
-      if (totDist < EPS11) break;
-  }
-#ifdef DEBUG
-  printQuad(qm, qID);
-  printf("\n\n=============================================================\n");
-  printf(" LEAVE MAKEPOSITIVE QUAD %d IS NOW AREA %d \n ", qID, area);
-  printf("\n\n=============================================================\n");
-#endif
-  if (area == 1 || (area == 2 && smooth == 0)) {
-      for (j = 0; j < 4; j++) {
-	  if (vfix[j] == 0 || inList(qm->vFix[0], &qm->vFix[1], quad[j]) != -1)
-	    continue;
-#ifdef DEBUG
-	  printf(" ATTENTION: FIXING vert %d \n ", quad[j]);
-#endif
-	  qm -> vFix[++qm -> vFix[0]] = quad[j];
-      }
-  }
-
-  return area;
-}
-
 
 static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
                             int fullReg)
 {
-  int    i, j, kq, kv, q, k, it = 0, itMax, ori[4], piv[4], area;
+  int    r, i, j, kq, kv, q, k, it = 0, v, l1, l2, itMax,  sum, ori[4], area, *sa = NULL;
   int    *quads = NULL, *verts = NULL, recover = 0, stat = EGADS_SUCCESS;
-  double dthetam, dthetaM, minT, maxT, angles[4], *uvxyz = NULL, quv[8], dist;
+  double angles[4], *uvxyz = NULL, uv[8];
 #ifdef DEBUG
   char   buffer[100];
 #endif
   vStar  *star = NULL;
 
-  uvxyz = EG_alloc(5 * qm -> totV * sizeof(double));
-  if (uvxyz == NULL ) return EGADS_MALLOC;
+  uvxyz = (double*)EG_alloc(5 * qm -> totV * sizeof(double));
+  quads = (int   *)EG_alloc(    qm -> totQ * sizeof(int));
+  verts = (int   *)EG_alloc(    qm -> totV * sizeof(int));
+  if (uvxyz == NULL || quads == NULL ||
+      verts == NULL) return EGADS_MALLOC;
   for (j = 0; j < qm -> totV; j++) {
     if (qm -> vType[j] != -1) continue;
     uvxyz[5 * j    ] = qm -> uvs [2 * j    ];
@@ -1931,25 +1389,20 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
     uvxyz[5 * j + 3] = qm -> xyzs[3 * j + 1];
     uvxyz[5 * j + 4] = qm -> xyzs[3 * j + 2];
   }
+  qm -> vFix[0] = 0;
+#ifdef DEBUG
+    printf(" Make valid mesh for %d points \n ", nP);
+    if ( nP > 0 )
+    for ( i = 0 ; i < nP; i++ ) printf(" list %d = %d \n ", i, pList[i]);
+    gnuData(qm, NULL);
+#endif
   if (fullReg == 0) { // move around only affected vertices
     if (nP == 0 || pList == NULL) {
       EG_free (uvxyz);
       return EGADS_SUCCESS;
     }
-    quads = (int *) EG_alloc(qm -> totQ * sizeof(int));
-    verts = (int *) EG_alloc(qm -> totV * sizeof(int));
-    if (quads == NULL || verts == NULL) {
-      if (quads != NULL) EG_free(quads);
-      if (verts != NULL) EG_free(verts);
-      EG_free(uvxyz);
-      return EGADS_MALLOC;
-    }
-#ifdef DEBUG
-    printf(" Make valid mesh for %d points \n ", nP);
-    for ( i = 0 ; i < nP; i++ ) printf(" list %d = %d \n ", i, pList[i]);
-    gnuData(qm, NULL);
-#endif
-    for (kv = kq = j = 0; j < nP; j++) {
+    recover = 1;
+    for (kv = j = 0; j < nP; j++) {
       if (qm -> vType[pList[j] - 1] == -2) continue;
       stat = EG_buildStar(qm, &star, pList[j]);
       if (stat != EGADS_SUCCESS || star == NULL) {
@@ -1958,149 +1411,167 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
         EG_free(verts);
         return stat;
       }
-      if (qm -> vType[star->verts[0] - 1] == -1 &&
+      if (qm -> vType[star->verts[0] - 1]   == -1 &&
           inList(kv, verts, star->verts[0]) == -1) verts[kv++] = star -> verts[0];
       for (i = 0; i < star -> nQ; i++) {
         if (star -> quads[i] == -1) continue;
-        if (inList(kq, quads, star->quads[i]) == -1)
-          quads[kq++] = star -> quads[i];
-        if (qm -> vType[star->verts[2 * i + 1] - 1] == -1 &&
+        if (qm -> vType[star->verts[2 * i + 1] - 1]   == -1 &&
             inList(kv, verts, star->verts[2 * i + 1]) == -1)
           verts[kv++] = star -> verts[2 * i + 1];
-        if (qm -> vType[star->verts[2 * i + 2] - 1] == -1 &&
+        if (qm -> vType[star->verts[2 * i + 2] - 1]   == -1 &&
             inList(kv, verts, star->verts[2 * i + 2]) == -1)
           verts[kv++] = star -> verts[2 * i + 2];
       }
     }
-    for ( i = 0; i < kv; i++ ) EG_computeCoords (qm, verts[i], NULL);
-    qm -> vFix[0] = 0;
-    for (i   = 0; i < kq; i++)
-      area = EG_makePositiveAngles(qm, 0.0, PI, quads[i], 0);
-    EG_free(quads);
-    for (i = 0; i < kv; i++) {
-	stat = EG_buildStar(qm, &star, verts[i]);
-	if (stat != EGADS_SUCCESS || star == NULL) {
-	    EG_free (uvxyz);
-	    EG_free (verts);
-	    return stat;
-	}
-	for (j = 0; j < star -> nQ; j++) {
-	    if (star -> quads[j] == -1) continue;
-	    area = EG_quadAngleOrientation(qm, star -> quads[j], ori, piv, angles);
-	    for ( k = 0 ; k < 4; k++ ) {
-		q = qm -> qIdx [ 4 * ( star -> quads[j] -1 ) + k ] - 1;
-		if ( qm -> vType[qm -> valence[q][3] - 1] > 0 ) {
-		    if ( area == 2 ) area = 0 ;
-		    break;
-		}
-	    }
-	    if ( area <= 0 ) {
-		recover = 1;
-		break;
-	    }
-	}
-	if (recover == 1) break;
-    }
-    EG_freeStar(&star);
-    EG_free(verts);
-    if (recover == 1) {
+  } else {
+      for ( kv = i = 0 ; i < qm -> totV; i++ ) {
+	  if ( qm -> vType[i] != -1 ) continue;
+	  verts[kv++] = i + 1;
+      }
+  }
+  itMax = 20;
+  for (kq = it = 0 ; it <  itMax; it++) {
+#ifdef DEBUG
+	  printf(" MAKEVALID IT %d ===================  \n ", it );
+	  gnuData(qm, NULL);
+#endif
+
+      for (r = 0 ; r < 2; r++ ) {
+#ifdef DEBUG
+	  printf(" ROUND %d ----- \n ", r );
+	  gnuData(qm, NULL);
+#endif
+	  for ( i = 0; i < kv; i++) {
+#ifdef DEBUG
+	      printf(" VERTEX %d \n ", verts[i] );
+	      gnuData(qm, NULL);
+#endif
+	      stat = EG_buildStar(qm, &star, verts[i]);
+	      if (stat != EGADS_SUCCESS || star == NULL) {
+		  EG_free (uvxyz);
+		  EG_free (verts);
+		  EG_free (quads);
+		  return stat;
+	      }
+	      sa     = EG_alloc ( star -> nQ * sizeof ( int ) ) ;
+	      if (sa == NULL ) {
+		  EG_free (uvxyz);
+		  EG_free (verts);
+		  EG_freeStar(&star);
+	      }
+	      for (sum  = j = 0; j < star -> nQ; j++) {
+		  if (star -> quads[j] == -1) continue;
+		  if (r == 0 && it == 0 &&
+		      inList(kq, quads, star -> quads[j]) == -1) quads[kq++] = star -> quads[j];
+		  sa[j] = EG_quadAngleOrientation(qm, star -> quads[j], ori, angles);
+		  q     = EG_quadVertIdx (qm, star -> quads[j], verts[i]);
+		  if ((r == 0 && angles[q] > PI ) || r == 1) sum++;
+	      }
+#ifdef DEBUG
+	      printf(" VERTEX %d / %d = %d has sum %d = %d\n ",
+		     i + 1, kv, verts[i], sum, star -> nQ );
+#endif
+	      if (sum > 0 ) {
+		  uv[0] = qm -> uvs [ 2 * (verts[i] - 1)    ];
+		  uv[1] = qm -> uvs [ 2 * (verts[i] - 1) + 1];
+		  EG_computeCoords (qm, verts[i]);
+		  for (j = 0 ; j < star -> nQ; j++ ) {
+		      if (star -> quads[j] == -1 ) continue;
+		      area = EG_quadAngleOrientation(qm, star -> quads[j], ori, angles);
+		      if  (sa[j] == area || area == 1 ||
+			  (sa[j] == 0    && area > 0  )) continue;
+		      printf(" AREA %d was %d now %d \n ", star -> quads[j], sa[j], area );
+		      /*gnuData(qm, NULL);
+		      for (k = 0 ; k < 4; k++ ) {
+			  q = qm -> qIdx [4 * ( star ->quads[j] - 1) + k] - 1;
+			  if (qm -> vType[q] != -1 || qm -> valence[q][2] != 3 ||
+			           angles[k] < PI) continue;
+			  printf(" VERTEX %d has ori %d angle %lf\n ", q + 1, ori[k], angles[k]);
+			  v  = qm -> valence[q][3] - 1;
+			  l1 = qm -> qIdx[4 * ( star ->quads[j] -1 ) + (k + 1)%4] -1;
+			  l2 = qm -> qIdx[4 * ( star ->quads[j] -1 ) + (k + 3)%4] -1;
+			  if (v == l1 || v == l2 ) {
+			      v = qm -> valence[q][4] -1;
+			      if (v == l1 || v == l2) v = qm -> valence[q][5] - 1;
+			  }
+			  printf(" TRY PULLING VERTEX %d towards %d \n ",q + 1, v+ 1);
+			  uv[2]                = qm -> uvs[2 * q    ];
+			  uv[3]                = qm -> uvs[2 * q + 1];
+			  qm -> uvs[2 * q    ] = 0.5 * ( qm -> uvs[2 * q    ] + qm -> uvs[2 * v    ]);
+			  qm -> uvs[2 * q + 1] = 0.5 * ( qm -> uvs[2 * q + 1] + qm -> uvs[2 * v + 1]);
+			  printVertex(qm, q + 1);
+			  updateVertex(qm, q + 1, &qm -> uvs[2 * q] );
+			  printVertex(qm, q + 1);
+			  area = EG_quadAngleOrientation(qm, star -> quads[j], ori, angles);
+			  if  (sa[j] == area || area == 1 ||
+			      (sa[j] == 0    && area > 0  )) {
+			      area = 10;
+			      break;
+			  }
+			  gnuData(qm, NULL);
+			  updateVertex(qm, q + 1, &uv[2]);
+		      }
+		      if ( area != 10 ) {*/
+#ifdef DEBUG
+			  gnuData(qm, NULL);
+			  printf(" RESET VERTEX %d  IT SCREWED UP QUAD %d B %d N %d\n ",
+				 verts[i], star -> quads[j], sa[j], area);
+#endif
+			  updateVertex(qm, verts[i], uv ) ;
+			  break;
+		//      }
+		  }
+	      }
+	      EG_free(sa);
+	  }
+      }
+      for (sum  = i = 0 ; i < kq; i++ ) {
+	  j = EG_quadAngleOrientation(qm, quads[i], ori,  angles);
+	  printf(" QUAD %d area %d \n ", quads[i], j ) ;
+	  /*if ( j == 2 ) {
+	      for ( k = 0 ; k < 4; k++ ) {
+		  q = qm -> qIdx [4 * ( quads[i] -1 ) + k] - 1;
+		  if (qm -> vType[qm -> valence[q][3] - 1] > 0 ) {
+		      j = 0 ;
+		      break;
+		  }
+	      }
+	      if ( j == 2 ) j = 1;
+	  }*/
+	  if ( j == 1 ) sum++;
+      }
+      if (sum == kq ) {
+	  recover = 0 ;
+	  if (fullReg == 0 ) break;
+      }
+  }
+  EG_free(star);
+  EG_free(quads);
+  EG_free(verts);
+  stat = EGADS_SUCCESS;
+  if ( recover == 1 ) {
 #ifdef DEBUG
       printf(" Mesh is invalid for MIN MAX TOTALS [0, 200 deg]\n");
       snprintf(buffer, 100,"face_%d_InvalidMesh_%d",
-               qm -> fID, qm -> plotcount);
+	       qm -> fID, qm -> plotcount);
       gnuData(qm , buffer);
 #endif
       stat = EGADS_GEOMERR;
       for (j = 0; j < qm -> totV; j++) {
-        if (qm -> vType[j] != -1) continue;
-        qm -> uvs  [ 2 * j    ] = uvxyz[ 5 * j    ];
-        qm -> uvs  [ 2 * j + 1] = uvxyz[ 5 * j + 1];
-        qm -> xyzs [ 3 * j    ] = uvxyz[ 5 * j + 2];
-        qm -> xyzs [ 3 * j + 1] = uvxyz[ 5 * j + 3];
-        qm -> xyzs [ 3 * j + 2] = uvxyz[ 5 * j + 4];
+	  if (qm -> vType[j] != -1) continue;
+	  qm -> uvs  [ 2 * j    ] = uvxyz[ 5 * j    ];
+	  qm -> uvs  [ 2 * j + 1] = uvxyz[ 5 * j + 1];
+	  qm -> xyzs [ 3 * j    ] = uvxyz[ 5 * j + 2];
+	  qm -> xyzs [ 3 * j + 1] = uvxyz[ 5 * j + 3];
+	  qm -> xyzs [ 3 * j + 2] = uvxyz[ 5 * j + 4];
       }
       qm -> invsteps++;
-    }
-    EG_free(uvxyz);
-  } else {
-    itMax   = 100;
-    minT    = 0.0;
-    maxT    = PI;
-    dthetam = (DEG5 - minT) / (double)itMax;
-    dthetaM = (PI - DEG160) / (double)itMax;
-    qm -> vFix[0] = 0;
-    for (it = 0; it < itMax; it++) {
-#ifdef DEBUG
-      printf("SMOOTH ROUND %d max %d \n ", it, itMax);
-#endif
-      for (q = 0; q < qm -> totQ; q++) {
-        if (qm -> qIdx[ 4 * q] == -2 ) continue;
-        for ( k = 0 ; k < 4; k++ ) {
-          quv[2 * k    ] = qm -> uvs [2 * (qm -> qIdx[4 * q + k] - 1)    ];
-          quv[2 * k + 1] = qm -> uvs [2 * (qm -> qIdx[4 * q + k] - 1) + 1];
-        }
-        if (EG_makePositiveAngles(qm, minT, maxT, q + 1, 1) == 0 ) {
-            for ( k = 0 ; k < 4; k++ ) {
-        	updateVertex (qm, qm -> qIdx[4 * q + k], &quv[ 2 * k] );
-            }
-            continue;
-        }
-        for (k = 0 ; k < 4; k++) {
-          kv = qm -> qIdx[4 * q + k] - 1;
-          dist = (quv[2* k    ] - qm -> uvs[2 * kv    ]) *
-          (quv[2* k    ] - qm -> uvs[2 * kv    ]) +
-          (quv[2* k + 1] - qm -> uvs[2 * kv + 1]) *
-          (quv[2* k + 1] - qm -> uvs[2 * kv + 1]);
-          if (dist < 1.e-08 || qm -> vType [kv] != -1) continue;
-          stat = EG_buildStar(qm, &star, kv + 1);
-          if (stat != EGADS_SUCCESS || star == NULL) continue;
-          for (j = i = 0; i < star -> nQ; i++)
-            if (EG_quadAngleOrientation(qm, star -> quads[i], ori,
-                                        piv, angles) == 1) j++;
-          if (j == star -> nQ) {
-            uvxyz[5 * kv    ] = qm -> uvs [2 * kv    ];
-            uvxyz[5 * kv + 1] = qm -> uvs [2 * kv + 1];
-            uvxyz[5 * kv + 2] = qm -> xyzs[3 * kv    ];
-            uvxyz[5 * kv + 3] = qm -> xyzs[3 * kv + 1];
-            uvxyz[5 * kv + 4] = qm -> xyzs[3 * kv + 2];
-            j = inList(qm->vFix[0], &qm->vFix[1], kv + 1);
-            if (j != -1) {
-              qm -> vFix[0]--;
-              for (i = j + 1; i < qm -> vFix[0]; i++)
-                qm -> vFix[i] = qm -> vFix[i + 1];
-            }
-          } else {
-            qm -> uvs [2 * kv    ] = uvxyz[ 5 * kv    ];
-            qm -> uvs [2 * kv + 1] = uvxyz[ 5 * kv + 1];
-            qm -> xyzs[3 * kv    ] = uvxyz[ 5 * kv + 2];
-            qm -> xyzs[3 * kv + 1] = uvxyz[ 5 * kv + 3];
-            qm -> xyzs[3 * kv + 2] = uvxyz[ 5 * kv + 4];
-            for (j = i = 0; i < star -> nQ; i++)
-              if (EG_quadAngleOrientation(qm, star -> quads[i], ori,
-                                          piv, angles) == 1) j++;
-            if (j == star -> nQ &&
-                inList(qm->vFix[0], &qm->vFix[1], kv + 1) == -1) {
-#ifdef DEBUG
-              printf(" makeValid :: fixing vertex %d \n ", kv + 1);
-#endif
-              qm -> vFix[++qm -> vFix[0]] = kv + 1;
-            }
-          }
-        }
-      }
-      minT += dthetam;
-      maxT -= dthetaM;
-      if (fullReg != 1) break;
-    }
-    EG_free(uvxyz);
-    EG_freeStar(&star);
-    stat = EGADS_SUCCESS;
   }
+  EG_free(uvxyz);
 #ifdef DEBUG
   printf(" LEAVING PEACEFULLY FROM OPTIMIZER ??? %d \n ", stat);
   gnuData(qm, NULL);
 #endif
-  qm -> vFix[0] = 0;
   return stat;
 }
 
@@ -2312,9 +1783,9 @@ static int EG_swappingOperation(meshMap *qm, quadGroup qg, int swap,
       if (qm -> vType[i - 1] != -1) continue;
       q    = 0;
       if (EG_quadVertIdx(qm, qID[q], i) < 0) q = 1;
-      area = EG_quadAngleOrientation(qm, qID[q], ori, piv, angles);
+      area = EG_quadAngleOrientation(qm, qID[q], ori, angles);
       if (area <  0) return area;
-      if (area == 0) EG_computeCoords(qm, i, NULL);
+      if (area == 0) EG_computeCoords(qm, i);
   }
   *activity = 1;
   if (EG_makeValidMesh(qm, 6, qg.verts, 0) == EGADS_SUCCESS) {
@@ -2361,7 +1832,9 @@ static int EG_splittingOperation(meshMap *qm, int vC, int vL, int vR,
       printf("In EG_splittingOperation :: EG_backupQuads %d !!\n", stat);
       return stat;
   }
-  EG_centroid (qm, vC, uvall, 1);
+  uvall[0] = qm -> uvs [ 2 * ( vC - 1)    ];
+  uvall[1] = qm -> uvs [ 2 * ( vC - 1) + 1];
+  EG_centroid (qm, qm -> valence[vC -1][2], &qm -> valence[vC -1][3], uvall, 1);
   if (qm -> remQ[0] > 0) {
       poly[3] = qm -> remV[qm -> remV[0]--];
       newQ    = qm -> remQ[qm -> remQ[0]--];
@@ -2473,14 +1946,20 @@ static int EG_splittingOperation(meshMap *qm, int vC, int vL, int vR,
   if (qm -> vType[poly[0] - 1] == -1 ) {
       if (qm -> vType[poly[3] -1] != -1 ) updateVertex(qm, poly[0], uvall);
       else {
-	  EG_centroid (qm, poly[0], uv, 1);
+	  uv[0] = qm -> uvs[ 2 * ( poly[0] -1 )    ];
+	  uv[1] = qm -> uvs[ 2 * ( poly[0] -1 ) + 1];
+	  EG_centroid ( qm, qm -> valence[poly[0] -1][2],
+		       &qm -> valence[poly[0] -1][3], uv, 1);
 	  updateVertex(qm, poly[0], uv);
       }
   }
   if (qm -> vType[poly[3] - 1] == -1 ) {
       if (qm -> vType[poly[0] -1] != -1 ) updateVertex(qm, poly[3], uvall);
       else {
-	  EG_centroid (qm, poly[3], uv, 1);
+	  uv[0] = qm -> uvs[ 2 * ( poly[3] -1 )    ];
+	  uv[1] = qm -> uvs[ 2 * ( poly[3] -1 ) + 1];
+	  EG_centroid ( qm, qm -> valence[poly[3] -1][2],
+		       &qm -> valence[poly[3] -1][3], uv, 1);
 	  updateVertex(qm, poly[3], uv);
       }
   }
@@ -2581,7 +2060,10 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
   q = qm -> valence[ centre - 1][3] - 1;
   if (doublet == 0 && qm -> vType[oldQ[2] - 1] == -1 &&
       (qm -> vType[q] == -1 || qm -> vType[q] < 4)) {
-       stat = EG_centroid(qm, oldQ[2] , uv, 1);
+      uv[0] = qm -> uvs[ 2 * ( oldQ[0] -1 )    ];
+      uv[1] = qm -> uvs[ 2 * ( oldQ[0] -1 ) + 1];
+      stat  = EG_centroid(qm, qm -> valence[oldQ[2] -1][2],
+			  &qm -> valence[oldQ[2] -1][3], uv, 1);
        updateVertex(qm, oldQ[2], uv);
   }
   stat      = EG_buildStar(qm, &star, centre);
@@ -2664,10 +2146,10 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
   *activity  = 1;
   if (qm ->vType  [oldQ[1] - 1]    == -1 &&
       qm ->valence[oldQ[1] - 1][2] ==  2)
-    EG_computeCoords(qm, oldQ[1],NULL);
+    EG_computeCoords(qm, oldQ[1]);
   if (qm ->vType  [oldQ[3] - 1]    == -1 &&
       qm ->valence[oldQ[3] - 1][2] ==  2)
-    EG_computeCoords(qm, oldQ[3], NULL);
+    EG_computeCoords(qm, oldQ[3]);
   if (doublet == 1 || (EG_makeValidMesh(qm, 3, &oldQ[1], 0) == EGADS_SUCCESS)) {
       EG_free(quad);
       return EGADS_SUCCESS;
@@ -3953,27 +3435,27 @@ int EG_meshRegularization(meshMap *qm)
   qm -> pp = 1;
   initSurf = 0.0; maxErrInit = 0.0;
   for (i   = 0; i < qm -> totQ; i++) {
-	  pos[0] = pos[1] = pos[2] = 0.0;
-	  quv[0] = quv[1] = 0.0;
-	  for ( k = 0; k < 4; k++ ) {
-		j       = qm -> qIdx [ 4 * i + k] - 1;
-		pos[0] += 0.25 * qm -> xyzs[ 3 * j    ];
-		pos[1] += 0.25 * qm -> xyzs[ 3 * j + 1];
-		pos[2] += 0.25 * qm -> xyzs[ 3 * j + 2];
-		quv[0] += 0.25 * qm -> uvs [ 2 * j    ];
-		quv[1] += 0.25 * qm -> uvs [ 2 * j + 1];
-	  }
-	  if (quv[0] < qm -> range[0] || quv[0] > qm -> range[1] ||
-	      quv[1] < qm -> range[2] || quv[1] > qm -> range[3] ) {
-	      quv[0] = qm -> uvs [ 2 * j    ];
-	      quv[1] = qm -> uvs [ 2 * j + 1];
-	  }
-	  stat = EG_invEvaluateGuess(qm -> face, pos, quv, pInv);
-	  aux  = (pos[0] - pInv[0]) * ( pos[0] - pInv[0] ) +
-	         (pos[1] - pInv[1]) * ( pos[1] - pInv[1] ) +
-		 (pos[2] - pInv[2]) * ( pos[2] - pInv[2] ) ;
-	 maxErrInit = MAX (maxErrInit, aux );
-	 initSurf  += aux;
+      pos[0] = pos[1] = pos[2] = 0.0;
+      quv[0] = quv[1] = 0.0;
+      for ( k = 0; k < 4; k++ ) {
+	  j       = qm -> qIdx [ 4 * i + k] - 1;
+	  pos[0] += 0.25 * qm -> xyzs[ 3 * j    ];
+	  pos[1] += 0.25 * qm -> xyzs[ 3 * j + 1];
+	  pos[2] += 0.25 * qm -> xyzs[ 3 * j + 2];
+	  quv[0] += 0.25 * qm -> uvs [ 2 * j    ];
+	  quv[1] += 0.25 * qm -> uvs [ 2 * j + 1];
+      }
+      if (quv[0] < qm -> range[0] || quv[0] > qm -> range[1] ||
+	  quv[1] < qm -> range[2] || quv[1] > qm -> range[3] ) {
+	  quv[0] = qm -> uvs [ 2 * j    ];
+	  quv[1] = qm -> uvs [ 2 * j + 1];
+      }
+      stat = EG_invEvaluateGuess(qm -> face, pos, quv, pInv);
+      aux  = (pos[0] - pInv[0]) * ( pos[0] - pInv[0] ) +
+	  (pos[1] - pInv[1]) * ( pos[1] - pInv[1] ) +
+	  (pos[2] - pInv[2]) * ( pos[2] - pInv[2] ) ;
+      maxErrInit = MAX (maxErrInit, aux );
+      initSurf  += aux;
   }
 #ifdef REPORT
   printf(" Initial surface %d Quads ::  L2 error approx %1.2e  Linf %1.2e \n", qm -> totQ, initSurf, maxErrInit );
@@ -3986,116 +3468,116 @@ int EG_meshRegularization(meshMap *qm)
   ITMAX = qm -> totQ;
   round = 0;
   while ( it < ITMAX ) {
-	  actualSurf = 0.0; maxErr = 0.0;
-	  k = -1;
-	  for (si = j = i = 0; i < qm -> totQ; i++) {
-		  if ( qm -> qIdx[ 4 * i ] == -2 ) continue;
-		  pos[0]  = pos[1] = pos[2] = 0.0;
-		  quv[0]  = quv[1] = 0.0;
-		  for ( q = 0; q < 4; q++ ) {
-		          vq[q]   = qm -> qIdx [ 4 * i + q] - 1;
-			  pos[0] += 0.25 * qm -> xyzs[ 3 * vq[q]    ];
-			  pos[1] += 0.25 * qm -> xyzs[ 3 * vq[q] + 1];
-			  pos[2] += 0.25 * qm -> xyzs[ 3 * vq[q] + 2];
-			  quv[0] += 0.25 * qm -> uvs [ 2 * vq[q]    ];
-			  quv[1] += 0.25 * qm -> uvs [ 2 * vq[q] + 1];
-		  }
-		  if (quv[0] < qm -> range[0] || quv[0] > qm -> range[1] ||
-		      quv[1] < qm -> range[2] || quv[1] > qm -> range[3] ) {
-		      quv[0] = qm -> uvs [ 2 * vq[0]    ];
-		      quv[1] = qm -> uvs [ 2 * vq[0] + 1];
-		  }
-		  stat = EG_invEvaluateGuess(qm -> face, pos, quv, pInv);
-		  aux  = (pos[0] - pInv[0]) * ( pos[0] - pInv[0] ) +
-		 	 (pos[1] - pInv[1]) * ( pos[1] - pInv[1] ) +
-		 	 (pos[2] - pInv[2]) * ( pos[2] - pInv[2] ) ;
-		  maxErr      = MAX(maxErr, aux );
-		  actualSurf += aux;
-		  stat   = EG_evaluate(qm -> face, quv, pos );
-		  norm1  = pos[3] * pos[3] + pos[4] * pos[4] + pos[5] * pos[5];
-		  norm2  = pos[6] * pos[6] + pos[7] * pos[7] + pos[8] * pos[8];
-		  if (norm1 < EPS11 || norm2 < EPS11 ||
-		      inList (sq, skipQuad, i + 1 ) != -1 ) continue;
-		  v1[0] = pos[3]; v1[1] = pos[4]; v1[2] = pos[5];
-		  v2[0] = pos[6]; v2[1] = pos[7]; v2[2] = pos[8];
-		  if (qm -> face -> mtype == SREVERSE) {
-		      CROSS(v2, v1, qN);
-		  } else {
-		      CROSS(v1, v2, qN);
-		  }
-		  v1[0] = qm -> xyzs[3 * vq[1]    ] - qm -> xyzs[3 * vq[0]    ];
-		  v1[1] = qm -> xyzs[3 * vq[1] + 1] - qm -> xyzs[3 * vq[0] + 1];
-		  v1[2] = qm -> xyzs[3 * vq[1] + 2] - qm -> xyzs[3 * vq[0] + 2];
-		  v2[0] = qm -> xyzs[3 * vq[2]    ] - qm -> xyzs[3 * vq[0]    ];
-		  v2[1] = qm -> xyzs[3 * vq[2] + 1] - qm -> xyzs[3 * vq[0] + 1];
-		  v2[2] = qm -> xyzs[3 * vq[2] + 2] - qm -> xyzs[3 * vq[0] + 2];
-		  CROSS(v1, v2, cross);
-		  qArea[i] = 0.5 * sqrt ( DOT (cross, cross) ) ;
-		  s1       = 1;
-		  if (DOT(qN, cross) < 0) s1 = -1;
-		  v1[0] = qm -> xyzs[3 * vq[3]    ] - qm -> xyzs[3 * vq[0]    ];
-		  v1[1] = qm -> xyzs[3 * vq[3] + 1] - qm -> xyzs[3 * vq[0] + 1];
-		  v1[2] = qm -> xyzs[3 * vq[3] + 2] - qm -> xyzs[3 * vq[0] + 2];
-		  CROSS(v2, v1, cross);
-		  qArea[i] += 0.5 * sqrt ( DOT (cross, cross) ) ;
-		  s2        = 1;
-		  if (DOT(qN, cross) < 0) s2 = -1;
-		  if ( s1 * s2 == -1 && si == 0 ) {
+      actualSurf = 0.0; maxErr = 0.0;
+      k = -1;
+      for (si = j = i = 0; i < qm -> totQ; i++) {
+	  if ( qm -> qIdx[ 4 * i ] == -2 ) continue;
+	  pos[0]  = pos[1] = pos[2] = 0.0;
+	  quv[0]  = quv[1] = 0.0;
+	  for ( q = 0; q < 4; q++ ) {
+	      vq[q]   = qm -> qIdx [ 4 * i + q] - 1;
+	      pos[0] += 0.25 * qm -> xyzs[ 3 * vq[q]    ];
+	      pos[1] += 0.25 * qm -> xyzs[ 3 * vq[q] + 1];
+	      pos[2] += 0.25 * qm -> xyzs[ 3 * vq[q] + 2];
+	      quv[0] += 0.25 * qm -> uvs [ 2 * vq[q]    ];
+	      quv[1] += 0.25 * qm -> uvs [ 2 * vq[q] + 1];
+	  }
+	  if (quv[0] < qm -> range[0] || quv[0] > qm -> range[1] ||
+	      quv[1] < qm -> range[2] || quv[1] > qm -> range[3] ) {
+	      quv[0] = qm -> uvs [ 2 * vq[0]    ];
+	      quv[1] = qm -> uvs [ 2 * vq[0] + 1];
+	  }
+	  stat = EG_invEvaluateGuess(qm -> face, pos, quv, pInv);
+	  aux  = (pos[0] - pInv[0]) * ( pos[0] - pInv[0] ) +
+	      (pos[1] - pInv[1]) * ( pos[1] - pInv[1] ) +
+	      (pos[2] - pInv[2]) * ( pos[2] - pInv[2] ) ;
+	  maxErr      = MAX(maxErr, aux );
+	  actualSurf += aux;
+	  stat   = EG_evaluate(qm -> face, quv, pos );
+	  norm1  = pos[3] * pos[3] + pos[4] * pos[4] + pos[5] * pos[5];
+	  norm2  = pos[6] * pos[6] + pos[7] * pos[7] + pos[8] * pos[8];
+	  if (norm1 < EPS11 || norm2 < EPS11 ||
+	      inList (sq, skipQuad, i + 1 ) != -1 ) continue;
+	  v1[0] = pos[3]; v1[1] = pos[4]; v1[2] = pos[5];
+	  v2[0] = pos[6]; v2[1] = pos[7]; v2[2] = pos[8];
+	  if (qm -> face -> mtype == SREVERSE) {
+	      CROSS(v2, v1, qN);
+	  } else {
+	      CROSS(v1, v2, qN);
+	  }
+	  v1[0] = qm -> xyzs[3 * vq[1]    ] - qm -> xyzs[3 * vq[0]    ];
+	  v1[1] = qm -> xyzs[3 * vq[1] + 1] - qm -> xyzs[3 * vq[0] + 1];
+	  v1[2] = qm -> xyzs[3 * vq[1] + 2] - qm -> xyzs[3 * vq[0] + 2];
+	  v2[0] = qm -> xyzs[3 * vq[2]    ] - qm -> xyzs[3 * vq[0]    ];
+	  v2[1] = qm -> xyzs[3 * vq[2] + 1] - qm -> xyzs[3 * vq[0] + 1];
+	  v2[2] = qm -> xyzs[3 * vq[2] + 2] - qm -> xyzs[3 * vq[0] + 2];
+	  CROSS(v1, v2, cross);
+	  qArea[i] = 0.5 * sqrt ( DOT (cross, cross) ) ;
+	  s1       = 1;
+	  if (DOT(qN, cross) < 0) s1 = -1;
+	  v1[0] = qm -> xyzs[3 * vq[3]    ] - qm -> xyzs[3 * vq[0]    ];
+	  v1[1] = qm -> xyzs[3 * vq[3] + 1] - qm -> xyzs[3 * vq[0] + 1];
+	  v1[2] = qm -> xyzs[3 * vq[3] + 2] - qm -> xyzs[3 * vq[0] + 2];
+	  CROSS(v2, v1, cross);
+	  qArea[i] += 0.5 * sqrt ( DOT (cross, cross) ) ;
+	  s2        = 1;
+	  if (DOT(qN, cross) < 0) s2 = -1;
+	  if ( s1 * s2 == -1 && si == 0 ) {
 #ifdef DEBUG
-		      printf(" Quad %d self-intersects: try destroy\n ", i + 1 );
-		      gnuData(qm, NULL);
-		      printQuad(qm, i + 1 ) ;
+	      printf(" Quad %d self-intersects: try destroy\n ", i + 1 );
+	      gnuData(qm, NULL);
+	      printQuad(qm, i + 1 ) ;
 #endif
-		      qArea[i] = 0.0; //invalid quad: self-intersects.
-		      k  = i;
-		      si = 1;
-		  }
-		  if (si ==  0 &&
-		     ((k == -1 && EG_nValenceCount(qm, i + 1, 3) > 0) ||
-		      (k != -1 && fabs(qArea[i]) < fabs(qArea[k])))) k = i;
+	      qArea[i] = 0.0; //invalid quad: self-intersects.
+	      k  = i;
+	      si = 1;
 	  }
+	  if (si ==  0 &&
+	      ((k == -1 && EG_nValenceCount(qm, i + 1, 3) > 0) ||
+		  (k != -1 && fabs(qArea[i]) < fabs(qArea[k])))) k = i;
+      }
 #ifdef DEBUG
-	  printf("IT %d (ROUND %d) L2 err %1.2e  vs %1.2e Linf %1.2e VS %1.2e -->%.2f %%\n",
-		 it, round,         initSurf, actualSurf, maxErrInit, maxErr, actualSurf / initSurf * 100.0 );
+      printf("IT %d (ROUND %d) L2 err %1.2e  vs %1.2e Linf %1.2e VS %1.2e -->%.2f %%\n",
+	     it, round,         initSurf, actualSurf, maxErrInit, maxErr, actualSurf / initSurf * 100.0 );
 #endif
-	  if (actualSurf > 1.e-14 && initSurf > 1.e-14 &&
-	      actualSurf / initSurf > stol ) {
+      if (actualSurf > 1.e-14 && initSurf > 1.e-14 &&
+	  actualSurf / initSurf > stol ) {
 #ifdef DEBUG
-		  printf(" LEAVE %.12f VS %.12f !\n ", actualSurf / initSurf, stol);
+	  printf(" LEAVE %.12f VS %.12f !\n ", actualSurf / initSurf, stol);
 #endif
-		  break;
+	  break;
+      }
+      if (k == -1 ) {
+	  for (k = j = i = 0; i < qm -> totQ; i++) {
+	      if (qm -> qIdx [ 4 * i ] == -2 ||
+		  inList (sq, skipQuad, i + 1 ) != -1 ) continue;
+	      if (fabs(qArea[i]) < fabs(qArea[k]) || j == 0  ) {
+		  k = i;
+		  j = 1;
+	      }
 	  }
-	  if (k == -1 ) {
-		  for (k = j = i = 0; i < qm -> totQ; i++) {
-			  if (qm -> qIdx [ 4 * i ] == -2 ||
-			      inList (sq, skipQuad, i + 1 ) != -1 ) continue;
-			  if (fabs(qArea[i]) < fabs(qArea[k]) || j == 0  ) {
-				  k = i;
-				  j = 1;
-			  }
-		  }
-		  if ( j == 0 ) {
-			  if ( round < 20 ) sq = 0 ;
-			  else break;
-			  round++;
-			  continue;
-		  }
+	  if ( j == 0 ) {
+	      if ( round < 20 ) sq = 0 ;
+	      else break;
+	      round++;
+	      continue;
 	  }
-	  stat  = EG_collapse(qm, k + 1, &activity, 1);
-	  if (stat != EGADS_SUCCESS) {
-	      printf(" EG_meshRegularization :: preprocess EG_collapse for quad %d --> %d!!\n ",
-		     k + 1, stat);
-	      EG_free (skipQuad);
-	      EG_free (qArea   );
-	      return stat;
-	  }
-	  if (activity > 0) it++;
-	  else {
-	      if ( sq > qm -> totQ -1 ) {
-		  printf(" beyond bounds :: size sq %d and current %d\n ", qm -> totQ, sq );
-		  break;
-	      } skipQuad[sq++] = k + 1;
-	  }
+      }
+      stat  = EG_collapse(qm, k + 1, &activity, 1);
+      if (stat != EGADS_SUCCESS) {
+	  printf(" EG_meshRegularization :: preprocess EG_collapse for quad %d --> %d!!\n ",
+		 k + 1, stat);
+	  EG_free (skipQuad);
+	  EG_free (qArea   );
+	  return stat;
+      }
+      if (activity > 0) it++;
+      else {
+	  if ( sq > qm -> totQ -1 ) {
+	      printf(" beyond bounds :: size sq %d and current %d\n ", qm -> totQ, sq );
+	      break;
+	  } skipQuad[sq++] = k + 1;
+      }
   }
   EG_free (skipQuad);
   EG_free (qArea   );
