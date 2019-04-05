@@ -14,8 +14,9 @@
                       c[2] = (a[0]*b[1]) - (a[1]*b[0])
 #define DOT(a,b)     (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
 
-#define DEG175 3.0543
-#define DEG5   0.0873
+#define DEG160 2.79252680319093
+#define DEG10  0.1745329251994329
+#define DEG20  0.349065850398866
 #define PI     3.1415926535897931159979635
 
 #define EPS11  1.E-11
@@ -45,11 +46,12 @@ typedef struct{
 
 
 typedef struct {
-  int      fID, oriQ, oriV, plotcount, estQ, totQ,
-           totV, sizeV, sizeQ, *qIdx, *qAdj,
-	    **valence, *vType, *remQ, *remV, invsteps;
+  int      fID, oriQ, oriV, plotcount, uvtype, estQ, totQ,
+           totV, sizeV, sizeQ, *vFix, *qIdx, *qAdj,
+	    **valence, *vType, *remQ, *remV, pp, invsteps;
   ego      face;
-  double  range[4], *xyzs, *uvs, *qArea;
+  double   minsize, avsize, range[4];
+  double  *xyzs, *uvs;
 } meshMap;
 
 
@@ -68,7 +70,7 @@ typedef struct{
 
 extern int  EG_outLevel(const egObject *object);
 
-extern int  EG_createMeshMap(bodyQuad *bodydata);
+extern int  EG_createMeshMap(bodyQuad *bodydata, int uvtype);
 extern int  EG_meshRegularization(meshMap *qm);
 extern int  EG_makeQuadTess(bodyQuad bodydata, ego *quadTess);
 extern void EG_destroyMeshMap(bodyQuad *bodydata);
