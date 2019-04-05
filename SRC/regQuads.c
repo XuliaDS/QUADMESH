@@ -661,9 +661,6 @@ static int EG_restoreQuads(meshMap *qm, Quad *quad, int nq)
 }
 
 
-/*
- * type:  0 = quad , 1 = vertex
- */
 static int EG_centroid(meshMap *qm, int n, int *list, double *quv, int usequv)
 {
   int i, j = 0;
@@ -973,7 +970,7 @@ static int EG_quadAngleOrientation(meshMap *qm, int qID, int *ori, double *theta
 }
 
 
-static void EG_computeCoords(meshMap *qm, vStar *star, double weight )
+static void EG_computeCoords(meshMap *qm, vStar *star, int weight )
 {
   int    i, j, bdry, k, kk, i0, i1, vID, ori[4];
   double uvc[2], angles[4], uva[2];
@@ -986,7 +983,10 @@ static void EG_computeCoords(meshMap *qm, vStar *star, double weight )
   }
 
 #ifdef DEBUG
-  printf(" AVERAGE COORDS FOR VERTEX %d WEIGHT %lf \n ", vID + 1, weight);
+  if ( weight != -1 )
+  printf(" AVERAGE COORDS FOR VERTEX %d WEIGHT %d\n ", vID + 1, star -> verts[weight]);
+  else
+	  printf(" AVERAGE COORDS FOR VERTEX %d CENTROID NO BIAS\n ", vID + 1);
   printVertex(qm, vID + 1);
 #endif
   if (qm->valence[vID][2] == 2) {
@@ -1044,15 +1044,18 @@ static void EG_computeCoords(meshMap *qm, vStar *star, double weight )
 	  updateVertex (qm, vID + 1, uvc);
       }
   }
-  uva[0] = qm -> uvs[2 * vID    ];
-  uva[1] = qm -> uvs[2 * vID + 1];
-  i = EG_centroid(qm, qm -> valence[vID][2],
-		  &qm -> valence[vID][3], uva, 1) ;
+  uva[0] = uva[1] = 0.0;
+  i = EG_centroid(qm, star -> nV, star -> verts, uva, 0 );
+  //uva[0] = qm -> uvs[2 * vID    ];
+  //uva[1] = qm -> uvs[2 * vID + 1];
+  //i      = EG_centroid(qm, qm -> valence[vID][2],
+  	//                 &qm -> valence[vID][3], uva, 0) ;
   if ( i != EGADS_SUCCESS ) return;
-  if ( star -> nQ > 5 ) weight = 0.5;
-  if ( weight > 0.01 ) {
-      uva[0] = weight * qm -> uvs[2 * vID    ] + (1.0 - weight) * uva[0];
-      uva[1] = weight * qm -> uvs[2 * vID + 1] + (1.0 - weight) * uva[1];
+  if ( star -> nQ > 5 ) weight = 0;
+  if ( weight != -1 ) {
+	  i      = star -> verts[weight] - 1;
+	  uva[0] = 0.5 * (qm -> uvs[2 * i    ] + uva[0]);
+	  uva[1] = 0.5 * (qm -> uvs[2 * i + 1] + uva[1]);
   }
   if (uva[0] >= qm -> range[0] && uva[0] <= qm -> range[1] &&
       uva[1] >= qm -> range[2] && uva[1] <= qm -> range[3]) {
@@ -1262,22 +1265,23 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
 			    int fullReg)
 {
   int    v, q,  i, j, it = 0, itMax,  sum, ori[4], *qa = NULL, ta[50], m;
-  int     *verts = NULL, recover = 0, stat = EGADS_SUCCESS;
-  double  angles[4], *uvxyz = NULL, uv[8], *w = NULL;
+  int     *verts = NULL, recover = 0, stat = EGADS_SUCCESS, *w = NULL;
+  double  angles[4], *uvxyz = NULL, uv[8];
 #ifdef DEBUG
   char   buffer[100];
+  int k;
 #endif
   vStar  **star = NULL;
 
   uvxyz = (double*)EG_alloc(5 * qm -> totV * sizeof(double));
-  w     = (double*)EG_alloc(    qm -> totV * sizeof(double));
+  w     = (int   *)EG_alloc(    qm -> totV * sizeof(int   ));
   star  = (vStar**)EG_alloc(    qm -> totV * sizeof(vStar*));
   qa    = (int   *)EG_alloc(    qm -> totQ * sizeof(int));
   if (uvxyz == NULL ||  w == NULL ||
       star  == NULL || qa == NULL) return EGADS_MALLOC;
   for (j = 0; j < qm -> totV; j++) {
       star[j] = NULL;
-      w[j]    = 0.0;
+      w[j]    = -1;
       if (qm -> vType[j] != -1) continue;
       uvxyz[5 * j    ] = qm -> uvs [2 * j    ];
       uvxyz[5 * j + 1] = qm -> uvs [2 * j + 1];
@@ -1360,17 +1364,20 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
 		  }
 #endif
 		  updateVertex(qm, v + 1, uv) ;
-		  w[v] = (double)rand() / (RAND_MAX );
+		  w[v]++;
+		  if (w[v] == star[v] -> nV ) w[v] = -1;
+		  //= (double)rand() / (RAND_MAX );
 		  m    = 1;
 		  break;
 	      }
 	      if ( m == 1 ) continue;
-	      w[v] = 0.0;
+	      w[v] = -1;
 	      for (j = 0 ; j < star[v] -> nQ; j++) {
 		  if (star[v] -> quads[j] == -1 ) continue;
 		  qa[star[v] -> quads[j] - 1] = ta[j];
 		  if ( ta[j] != 1 ) {
-			  w[v] = (double)rand() / (RAND_MAX );
+			  w[v]++;// = (double)rand() / (RAND_MAX );
+			  if (w[v] == star[v] -> nV ) w[v] = -1;
 #ifdef DEBUG
 			  for (k = 0 ; k < star[v] -> nQ; k++ )
 			    printQuad(qm, star[v]-> quads[k]);
@@ -1383,7 +1390,9 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
       for (sum = i = 0 ; i < qm -> totQ; i++ ) {
 	  if ( qa[i] != -1 &&
 	      (qa[i] == 0 || (qa[i] == 2 && fullReg == 1 ))) {
+#ifdef DEBUG
 	      EG_quadAngleOrientation(qm, i + 1, ori, angles);
+#endif
 	      sum = 1;
 	      break;
 	  }
@@ -3324,7 +3333,7 @@ int EG_meshRegularization(meshMap *qm)
 {
   int    i, j, k, q, stat = EGADS_SUCCESS, round, s1, s2, vq[4], si;
   int    ITMAX, it = 0, activity = 0, totActivity = 0, loopact;
-  int    iV, quadPair[2], prevPair[2], totV, vQ, transfer = 0, *skipQuad = NULL, sq;
+  int    iV0, iV, quadPair[2], prevPair[2], totV, totV0, vQ0, vQ, transfer = 0, *skipQuad = NULL, sq;
   double l2Init, linfInit, l2Actual, linfActual, stol, norm1, norm2, err;
   double pos[18*2], quv[2],cross[3], v1[3], v2[3], qN[3], *qArea = NULL;
 #ifdef REPORT
@@ -3332,11 +3341,7 @@ int EG_meshRegularization(meshMap *qm)
 #endif
 
   // GET RANGE FOR EACH POINT
-  meshCount(qm, &iV, &totV, &vQ);
-#ifdef REPORT
-  printf("\n\n Face %d --> original mesh has %d QUADS, %d / %d irregular vertices (%.2f %%) \n",
-         qm -> fID, vQ, iV, totV, (double) iV * 100.0 / (double)totV);
-#endif
+  meshCount(qm, &iV0, &totV0, &vQ0);
   // PREPROCESS: Reduce the number of quads by forcing collapses everywhere
   EG_distToSurfCentre(qm, &l2Init, &linfInit);
 #ifdef REPORT
@@ -3471,8 +3476,8 @@ int EG_meshRegularization(meshMap *qm)
   EG_makeValidMesh(qm, 0, NULL, 2);
 #ifdef REPORT
       EG_distToSurfCentre(qm, &l2Actual, &linfActual);
-      printf(" Preprocessing step :: total collapses %d "
-	  "surface errors L2 %1.2e Linf %1.2e",it, l2Actual, l2Init);
+      printf(" Preprocessing step :: total collapses %d\n "
+	  "surface errors L2 %1.2e Linf %1.2e\n",it, l2Actual, l2Init);
 #endif
 #ifdef REPORT
       snprintf(buffer,100, "gnuPreprocess_%d.txt", qm -> fID);
@@ -3571,6 +3576,8 @@ int EG_meshRegularization(meshMap *qm)
   }
 #ifdef REPORT
   meshCount(qm, &iV, &totV, &vQ);
+  printf("\n\n Original mesh had %d QUADS, %d / %d irregular vertices (%.2f %%) \n",
+         vQ0, iV0, totV0, (double) iV0 * 100.0 / (double)totV0);
   printf("\n\n*******************************************************************\n");
   printf(" Final mesh has %d QUADS, %d / %d irregular vertices (%.2f %%) ============\n",
          vQ, iV, totV, (double) iV * 100.0 / (double) totV);
