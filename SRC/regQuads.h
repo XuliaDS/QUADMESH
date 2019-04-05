@@ -14,7 +14,7 @@
                       c[2] = (a[0]*b[1]) - (a[1]*b[0])
 #define DOT(a,b)     (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
 
-#define DEG175 3.0543
+#define DEG170 2.9671
 #define DEG5   0.0873
 #define PI     3.1415926535897931159979635
 
