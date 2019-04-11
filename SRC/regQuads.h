@@ -36,10 +36,6 @@ typedef struct{
   int verts[4], qadj[4], id;
 } Quad;
 
-typedef struct{
-	int    *area;
-	double *theta;
-}mArea;
 
 typedef struct{
   int  *verts, *quads;
@@ -49,12 +45,11 @@ typedef struct{
 
 
 typedef struct {
-  int      fID, oriQ, oriV, plotcount, totQ, totV,
-           sizeV, sizeQ, *qIdx, *qAdj, **valence,
-	   *qInv, *vType, *remQ, *remV, invsteps;
+  int      fID, oriQ, oriV, plotcount, totQ,
+           totV, sizeV, sizeQ, *qIdx, *qAdj,
+	    **valence, *valSize, *vType, *remQ, *remV, invsteps;
   ego      face;
   double   range[4],  *xyzs, *uvs;
-  vStar **star;
 } meshMap;
 
 
