@@ -1331,7 +1331,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
       printf(" MAKEVALID IT %d ===================  \n ", it );
 #endif
       for (q = 0 ; q < qm->totQ; q++) {
-	  if (a[0].area[q] == -1 || (it == 0 && a[0].area[q] == 3)) continue;
+	  if (a[0].area[q] == -1 ) continue;//|| (it == 0 && a[0].area[q] == 3)) continue;
 	  for (i = 0; i < 4; i++) {
 	      v  = qm->qIdx [4 * q + i ] - 1;
 	      if (mv[v] == 0) continue;
@@ -1340,9 +1340,10 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
 	      j1 = j2 = -1;
 	      for (j0 = j = 0 ;j < qm -> star[v]->nQ; j++ )
 		  j0 += a[0].area[ qm -> star[v]->quads[j] - 1];
-	      for (wi = k = 0; k <= qm -> star[v]->nQ; k++ ) {
+	      for (wi = k = 0; k <= qm -> star[v]->nV; k++ ) {
 		  if (k > 0) {
-		      wi = qm -> star[v]->verts[2 * (k - 1) + 1];
+		      //wi = qm -> star[v]->verts[2 * (k - 1) + 1];
+		      wi = qm -> star[v]->verts[k - 1];
 		      if (qm->vType[wi - 1] != -1 && fullReg == 1) continue;
 		  }
 		  EG_computeCoords (qm, v + 1, wi);
@@ -1789,7 +1790,7 @@ static int EG_splittingOperation(meshMap *qm, int vC, int vL, int vR,
 {
   int   qIdx[4], modQ[4], verts[4], adj[2], poly[4], q, newQ, i, j, stat;
   int   id0 = -1, id1 = -1, dist, links[4], vals[4], addedV = 0, nq, si, *list = NULL, n;
-  double uv[4], angle;
+  double uv[6], angle;
 
   Quad  *quad = NULL;
 
@@ -1857,15 +1858,6 @@ static int EG_splittingOperation(meshMap *qm, int vC, int vL, int vR,
 	  printf(" j %d =%d\n ", j, qm -> star[si]->verts[j]);
 #endif
       EG_free(quad);
-      setValence(qm, si + 1);
-      id0 = - 1; id1 = -1;
-        for (j = 0; j < qm -> star[si]->nQ; j++) {
-            if (qm -> star[si]->verts[2 * j + 1] == vL) id0 = j;
-            if (qm -> star[si]->verts[2 * j + 1] == vR) id1 = j;
-        }
-        printf(" ID %d %d \n ",id0, id1);
-        if (id0 != -1 && id1 != -1)
-          printf(" STAR had wrong valences\n ");
       return EGADS_INDEXERR;
   }
   poly [0] = qm -> star[si]->verts[0];
@@ -1931,40 +1923,44 @@ static int EG_splittingOperation(meshMap *qm, int vC, int vL, int vR,
   si = poly[3] - 1;
   if (qm -> star[si] == NULL) {
       fprintf(stderr," star %d ois NULL\n", poly[3]);
-      exit(1);
       return EGADS_MALLOC;
   }
   id0    = -1;
 #ifdef DEBUG
   printf(" SPLIT THRU %d\n ", poly[0] );
 #endif
-  for (q = j = 0 ; j <= qm -> star[si] -> nQ; j++ ) {
-      uv[0] = qm->uvs[2 * (poly[0] - 1)    ];
-      uv[1] = qm->uvs[2 * (poly[0] - 1) + 1];
-      if (j > 0)
-	q = qm -> star[si] -> verts[2 * ( j - 1 ) + 1];
-      stat = EG_centroid(qm, qm -> star[si] -> nQ, &qm -> valence[poly[3] -1][3],
-			                 uv, 1, q);
-      if (stat != EGADS_SUCCESS ) continue;
+  stat = EG_centroid(qm, qm -> star[si] -> nQ, &qm -> valence[poly[3] -1][3],
+			                 uv, 0, 0);
+  for (q = j = 0 ; j <= qm -> star[si] -> nV; j++ ) {
+      uv[2] = uv[0];
+      uv[3] = uv[1];
       updateVertex(qm, poly[3], uv);
+      if (j > 0)
+	//q = qm -> star[si] -> verts[2 * ( j - 1 ) + 1];
+	q = qm -> star[si] -> verts[j - 1];
+      stat = EG_centroid(qm, qm -> star[si] -> nQ, &qm -> valence[poly[3] -1][3],
+			 &uv[2], 1, q);
+      if (stat != EGADS_SUCCESS ) continue;
+      updateVertex(qm, poly[3], &uv[2]);
       for (id1  = i = 0; i < qm -> star[si] -> nQ; i++ )
-	  id1  += EG_quadAngleOrientation(qm, qm -> star[si] ->quads[i], &angle);
+	id1  += EG_quadAngleOrientation(qm, qm -> star[si] ->quads[i], &angle);
+#ifdef DEBUG
+      printf(" WEIGHT %d is better %d vs %d ? \n ", q, id1, id0);
+#endif
       if (id1 > id0) {
 #ifdef DEBUG
-	  printf(" WEIGHT %d is better %d vs %d \n ", q, id1, id0);
+	  printf(" YEP !!\n");
 #endif
 	  id0 = id1;
-	  uv[2] = uv[0];
-	  uv[3] = uv[1];
+	  uv[4] = uv[2];
+	  uv[5] = uv[3];
       }
-      if ( id1 == 3 * qm -> star[si] -> nQ ) break;
-  }
-  updateVertex(qm, poly[3], &uv[2]);
+
 #ifdef DEBUG
       char buffer[100];
       int k, kk, v;
       double p[2], pos[18];
-      snprintf(buffer, 100,"SPLIT_%d_%d", poly[3], qm->plotcount++);
+      snprintf(buffer, 100,"SPLIT_%d_%d_%d",qm->plotcount, si + 1, j);
       printf("Writing in %s\n ", buffer);
       FILE *fout = fopen(buffer,"w");
       if (fout != NULL ) {
@@ -1987,7 +1983,9 @@ static int EG_splittingOperation(meshMap *qm, int vC, int vL, int vR,
 	  fclose (fout);
       }
 #endif
-
+      if ( id1 == 3 * qm -> star[si] -> nQ ) break;
+  }
+  updateVertex(qm, poly[3], &uv[4]);
 #ifdef DEBUG
   printf(" SPLIT CENTRE 0 %d \n ", poly[3]);
   printVertex(qm, poly[3]);
@@ -2033,6 +2031,7 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
 
   nq        = 1;
   stat      = EG_backupQuads(qm, &nq, &qC, &quad);
+  stat     += EG_centroid(qm, 4, &qm -> qIdx[4 * (qC - 1)], uv, 0, 0);
   if (stat != EGADS_SUCCESS || quad == NULL) {
       printf(" In EG_mergeVertices stat in EG_backpQuads %d !!\n ", stat);
       return stat;
@@ -2085,19 +2084,7 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
       }
       qm->qAdj[4 * (q - 1) + adjPair[0]] = adjq;
   }
-  list = EG_alloc(qm -> totV * sizeof ( int ));
-  if (list == NULL) {
-      EG_free(quad);
-      return EGADS_MALLOC;
-  }
-  n = 0;
-  for (j = 1; j < qm -> star[oldQ[0] - 1] -> nV; j++) {
-      q  = qm->star[oldQ[0] - 1] -> verts[j];
-      if ( q == -1 || q == oldQ[0] ) continue;
-      if (inList(n, list, q ) == -1 ) list[n++] = q;
-  }
-
-  // Eliminate vertex oldQ[0] from all the quads and its valences
+    // Eliminate vertex oldQ[0] from all the quads and its valences
   for (i = 0; i < qm -> star[oldQ[0] - 1]->nQ; ++i) {
       q = qm -> star[oldQ[0] - 1]->quads[i];
       if      (q == -1) continue; // ghost quad
@@ -2130,18 +2117,23 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
 	  return EGADS_INDEXERR;
       }
   }
+  setValence(qm, oldQ[2]);
+  setValence(qm, oldQ[1]);
+  setValence(qm, oldQ[3]);
+  list = EG_alloc(qm -> totV * sizeof ( int ));
+  if (list == NULL) {
+      EG_free(quad);
+      return EGADS_MALLOC;
+  }
+  n = 0;
   for (i = 1; i < 4; i++) {
-      if (inList(n, list, oldQ[i]) == -1) list[n++] = oldQ[i];
       for (j = 1; j < qm -> star[oldQ[i] - 1] -> nV; j++) {
 	  q  = qm->star[oldQ[i] - 1] -> verts[j];
-	  if ( q == -1 || q == oldQ[0] ) continue;
+	  if ( q == -1 ) continue;
 	  if (inList(n, list, q ) == -1 ) list[n++] = q;
       }
   }
   for ( i = 0 ; i < n; i++ ) {
-#ifdef DEBUG
-      printf(" LIST VALENCE %d \n ", list[i]);
-#endif
       stat = setValence(qm, list[i]);
       if (stat != EGADS_SUCCESS) {
 	  printf(" EG_mergeVertices error setting valence %d \n ", list[i]);
@@ -2160,14 +2152,17 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
 	  return EGADS_MALLOC;
       }
       id0 = -1;
-      uv[0] = qm->uvs[2 * (oldQ[2] - 1)    ];
-      uv[1] = qm->uvs[2 * (oldQ[2] - 1) + 1];
-      for (q = j = 0 ; j <= qm -> star[si] -> nQ; j++ ) {
-	  uv[2] = uv[0];
-	  uv[3] = uv[1];
+      for (q = j = 0 ; j <= qm -> star[si] -> nV; j++ ) {
+	  uv[2]  = uv[0];
+	  uv[3]  = uv[1];
+	  updateVertex(qm, si + 1, uv);
+#ifdef DEBUG
+	  printVertex(qm, si + 1 );
+#endif
 	  if (j > 0)
-	    q = qm -> star[si] -> verts[2 * ( j - 1 ) + 1];
-	  stat = EG_centroid(qm, qm -> star[si] -> nQ, &qm -> valence[oldQ[2] - 1][3],
+	    //q = qm -> star[si] -> verts[2 * ( j - 1 ) + 1];
+	    q = qm -> star[si] -> verts[j -1];
+	  stat = EG_centroid(qm, qm -> star[si] -> nQ, &qm -> valence[si][3],
 			     &uv[2], 1, q);
 	  if (stat != EGADS_SUCCESS ) continue;
 	  updateVertex(qm, oldQ[2], &uv[2]);
@@ -2181,9 +2176,37 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
 	      uv[4] = uv[2];
 	      uv[5] = uv[3];
 	  }
+#ifdef DEBUG
+	  char buffer[100];
+	  int k, kk, v;
+	  double p[2], pos[18];
+	  snprintf(buffer, 100,"COLLAPSE_%d_%d_%d", qm->plotcount, si + 1, j);
+	  printf("Writing in %s\n ", buffer);
+	  FILE *fout = fopen(buffer,"w");
+	  if (fout != NULL ) {
+	      for (k = 0 ; k < qm -> star[si] -> nQ; k++ ) {
+		  p[0] = p[1] = 0.0;
+		  for (kk = 0; kk <= 4; kk++) {
+		      v = qm->qIdx[ 4 * (qm -> star[si] -> quads[k] -1) + kk%4 ] - 1;
+		      fprintf(fout, "%lf %lf %lf %d\n",  qm->xyzs[3*v  ],
+			      qm->xyzs[3*v + 1], qm->xyzs[3*v + 2], v + 1 );
+		      if ( kk == 4 ) break;
+		      p[0] += 0.25 * qm->uvs[2 * v    ];
+		      p[1] += 0.25 * qm->uvs[2 * v + 1];
+		  }
+		  fprintf(fout,"\n\n");
+		  EG_evaluate(qm->face, p, pos);
+		  fprintf(fout, "%lf %lf %lf %d\n", pos[0], pos[1], pos[2],
+			  qm -> star[si] -> quads[k]);
+		  fprintf(fout,"\n\n");
+	      }
+	      fclose (fout);
+	  }
+#endif
 	  if ( id1 == 3 * qm -> star[si] -> nQ ) break;
+
       }
-      updateVertex(qm, oldQ[2], &uv[4]);
+      updateVertex(qm, si + 1, &uv[4]);
   }
   qm->vType[oldQ[0] - 1]  = -2; // -2 = removed
   qm->remQ[++qm->remQ[0]] = qC;
