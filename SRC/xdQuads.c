@@ -1078,11 +1078,14 @@ static int EG_placeVertex(meshMap *qm, int full, int vID, /*@null@*/ mArea *a ) 
 	  //  printQuad(qm, qm -> star[v]->quads[i]);
 #endif
 	  stat = EG_normalAtVertex(qm, vID, normal, xyz);
-	  for (i = 0; i < qm -> star[v]->nQ; i++) {
+	  for (j = i = 0; i < qm -> star[v]->nQ; i++) {
 	      b.area[i]      = EG_quadArea(qm, normal, xyz, qm -> star[v]->quads[i], &b.theta[i]);
-	      if (b.area[i] != 3) break;
+	      if (b.area[i] != QA0) {
+		  j = 1;
+		  break;
+	      }
 	  }
-	  if ( j == 3 ) {
+	  if ( j == 0 ) {
 #ifdef DEBUG
 	      printf(" VERTEX IS GOOD \n ");
 #endif
@@ -1145,7 +1148,7 @@ static int EG_placeVertex(meshMap *qm, int full, int vID, /*@null@*/ mArea *a ) 
       }
       copy = 1;
       if (jc != -1 ) {
-	  if      (jc  > jb) copy = 0 ;
+	  if      (jc  < jb) copy = 0 ;
 	  else if (jc == jb) {
 #ifdef DEBUG
 	      printf(" CHECK WHICH POSITION IS BETTER BASED ON LARGEST ANGLE\n ");
@@ -1575,8 +1578,8 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
 		  qm->qInv[0]--;
 	      }
 	  }
-	  if      (a.area[q] != QA && fullReg == 1) sum = 2;
-	  else if (a.area[q]  > QA1)                sum = 1;
+	  if      (a.area[q] != QA0 && fullReg == 1) sum = 2;
+	  else if (a.area[q]  > QA1)                 sum = 1;
 #ifdef DEBUG
 	  printf(" QUAD = %d --> QA %d sum %d\n ", q + 1, a.area[q], sum );
 #endif
