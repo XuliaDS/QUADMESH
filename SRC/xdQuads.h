@@ -31,7 +31,10 @@
 #define SWAPDOUBLESPLIT     5
 #define DOUBLESWAP          6
 
-
+#define QA0 0
+#define QA1 100
+#define QA2 10000
+#define QA3 1000000
 typedef struct{
   int verts[4], qadj[4], id;
 } Quad;
