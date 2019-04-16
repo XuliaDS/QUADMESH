@@ -6,7 +6,7 @@ ODIR  = obj
 TDIR  = BUILDS
 FILE  = regQuads
 SFILE = $(FILE).c
-SDIR  = SRC
+SDIR  = espsrc
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
 	$(CC) -g -pg -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
 		-L$(LDIR) -legads -lm

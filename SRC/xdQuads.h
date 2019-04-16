@@ -14,8 +14,6 @@
                       c[2] = (a[0]*b[1]) - (a[1]*b[0])
 #define DOT(a,b)     (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
 
-#define DEG170 2.9671
-#define DEG5   0.0873
 #define PI     3.1415926535897931159979635
 
 #define EPS11  1.E-11
@@ -35,13 +33,14 @@
 #define QA1 100
 #define QA2 10000
 #define QA3 1000000
+
 typedef struct{
   int verts[4], qadj[4], id;
 } Quad;
 
 typedef struct{
-	int    *area;
-	double *theta;
+  int    *area;
+  double *theta;
 }mArea;
 
 typedef struct{
@@ -53,8 +52,8 @@ typedef struct{
 
 typedef struct {
   int      fID, oriQ, oriV, plotcount, totQ, totV,
-           sizeV, sizeQ, *qIdx, *qAdj, **valence,
-	   *qInv, *vType, *remQ, *remV, invsteps;
+  sizeV, sizeQ, *qIdx, *qAdj, **valence,
+  *qInv, *vType, *remQ, *remV, invsteps;
   ego      face;
   double   range[4],  *xyzs, *uvs;
   vStar **star;

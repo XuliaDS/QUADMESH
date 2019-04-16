@@ -54,6 +54,8 @@
                                     <listOptionValue builtIn="false" value="/home/docampo/EngSketchPad/include"/>
                                     									
                                     <listOptionValue builtIn="false" value="/home/julia/ESP/include"/>
+                                    									
+                                    <listOptionValue builtIn="false" value="&quot;${workspace_loc:/QUADMESH/SRC/xdQuads.h}&quot;"/>
                                     								
                                 </option>
                                 								
@@ -84,6 +86,16 @@
                         </toolChain>
                         					
                     </folderInfo>
+                    					
+                    <fileInfo id="cdt.managedbuild.toolchain.gnu.base.1888877814.1924251948" name="xdQuads.c" rcbsApplicability="disable" resourcePath="SRC/xdQuads.c" toolsToInvoke="cdt.managedbuild.tool.gnu.c.compiler.base.355670168.1479286756">
+                        						
+                        <tool id="cdt.managedbuild.tool.gnu.c.compiler.base.355670168.1479286756" name="GCC C Compiler" superClass="cdt.managedbuild.tool.gnu.c.compiler.base.355670168">
+                            							
+                            <inputType id="cdt.managedbuild.tool.gnu.c.compiler.input.832643236" superClass="cdt.managedbuild.tool.gnu.c.compiler.input"/>
+                            						
+                        </tool>
+                        					
+                    </fileInfo>
                     				
                 </configuration>
                 			
@@ -134,5 +146,17 @@
     </storageModule>
     	
     <storageModule moduleId="org.eclipse.cdt.make.core.buildtargets"/>
+    	
+    <storageModule moduleId="refreshScope" versionNumber="2">
+        		
+        <configuration configurationName="Default">
+            			
+            <resource resourceType="PROJECT" workspacePath="/QUADMESH"/>
+            		
+        </configuration>
+        	
+    </storageModule>
+    	
+    <storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
     
 </cproject>

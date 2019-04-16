@@ -7,14 +7,15 @@ TDIR  = BUILDS
 FILE  = xdQuads
 SFILE = $(FILE).c
 SDIR  = SRC
+DBG   = -g -pg
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
-	$(CC) -g -pg -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
-		-L$(LDIR) -legads -lm
+	$(CC)  -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
+	  -$DBG	-L$(LDIR) -legads -lm
 
 $(ODIR)/$(FILE).o:	$(SDIR)/$(SFILE) $(IDIR)/egads.h $(IDIR)/egadsTypes.h \
 			$(IDIR)/egadsErrors.h $(SDIR)/$(FILE).h
-	$(CC) -g -pg -c $(COPTS) $(DEFINE) -DSTANDALONE -I$(IDIR) \
-		 $(SDIR)/$(SFILE) -o $(ODIR)/$(FILE).o
+	$(CC)  -c $(COPTS) $(DEFINE) -DSTANDALONE -I$(IDIR) \
+	-$DBG	 $(SDIR)/$(SFILE) -o $(ODIR)/$(FILE).o
 
 clean:
 	-rm $(ODIR)/$(FILE).o
