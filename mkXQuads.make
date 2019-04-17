@@ -9,13 +9,13 @@ SFILE = $(FILE).c
 SDIR  = SRC
 DBG   = -g -pg
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
-	$(CC)  -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
-	  -$DBG	-L$(LDIR) -legads -lm
+	$(CC) $(DBG) -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
+	-L$(LDIR) -legads -lm
 
 $(ODIR)/$(FILE).o:	$(SDIR)/$(SFILE) $(IDIR)/egads.h $(IDIR)/egadsTypes.h \
 			$(IDIR)/egadsErrors.h $(SDIR)/$(FILE).h
-	$(CC)  -c $(COPTS) $(DEFINE) -DSTANDALONE -I$(IDIR) \
-	-$DBG	 $(SDIR)/$(SFILE) -o $(ODIR)/$(FILE).o
+	$(CC) $(DBG)  -c $(COPTS) $(DEFINE) -DSTANDALONE -I$(IDIR) \
+	$(SDIR)/$(SFILE) -o $(ODIR)/$(FILE).o
 
 clean:
 	-rm $(ODIR)/$(FILE).o
