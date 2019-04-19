@@ -33,14 +33,14 @@
 #define QA1 100
 #define QA2 10000
 #define QA3 1000000
-
+#define ANGPASS 3.1
 typedef struct{
   int verts[4], qadj[4], id;
 } Quad;
 
 typedef struct{
   int    *area;
-  double *theta;
+  double *ratio;
 }mArea;
 
 typedef struct{
