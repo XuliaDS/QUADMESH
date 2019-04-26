@@ -16,7 +16,8 @@
 
 #define PI     3.1415926535897931159979635
 
-#define EPS11  1.E-11
+//#define EPS11  1.E-11
+#define EPS08  1.E-08
 
 #define SWAP                0
 #define COLLAPSE            1
@@ -29,10 +30,13 @@
 #define SWAPDOUBLESPLIT     5
 #define DOUBLESWAP          6
 
-#define QA0 0
-#define QA1 100
-#define QA2 10000
-#define QA3 1000000
+#define QA0  0
+#define QA1  100
+#define QA2  10000
+#define QA3  1000000
+#define QACB 100000000   // crosses domain bounds: SUPER INVALID
+
+
 #define ANGPASS 3.1
 typedef struct{
   int verts[4], qadj[4], id;
