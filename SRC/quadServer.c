@@ -118,6 +118,7 @@ int main(int argc, char *argv[])
 	  }
 	  vt  += nvert[f];
 	  qt  += nquad[f];
+	  printf(" FACE %d ---> QUADS %d\n ", piv[f], nquad[f]);
 	  xyzs = (double *) malloc(3*nvert[f]*sizeof(double));
 	  tris = (int    *) malloc(6*nquad[f]*sizeof(int));
 	  segs = (int    *) malloc(8*nquad[f]*sizeof(int));
