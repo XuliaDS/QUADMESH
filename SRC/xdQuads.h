@@ -29,7 +29,8 @@
 #define DOUBLESPLIT         4
 #define SWAPDOUBLESPLIT     5
 #define DOUBLESWAP          6
-
+#define DEG5   0.0872664625997165
+#define DEG175 3.05432619099008
 #define QA0  0
 #define QA1  100
 #define QA2  10000
