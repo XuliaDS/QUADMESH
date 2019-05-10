@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
       printf("\n Usage: quadServer ndatafile(s) RGB colorbox (3 floats) \n\n");
       return 1;
   }
-  printf(" Color Boxes: 1 = green 2 = acdl\n\n");
+  printf(" Color Boxes: 1 = green 2 = acdl 3 = reverse acdl\n\n");
   scanf ("%d", &i );
   switch(i) {
     case 1:
@@ -54,6 +54,15 @@ int main(int argc, char *argv[])
        colorLine[1] = 0.0;
        colorLine[2] = 0.2;
        break;
+    case 3:
+      printf(" YOU HAVE CHOSEN REVERSED ACDL\n ");
+      colorLine[0]  = 255.0/255.0;
+      colorLine[1]  = 255.0/255.0;
+      colorLine[2]  = 255.0/255.0;
+      colorBox[0] = 138.0/255.0;
+      colorBox[1] = 23.0/255.0;
+      colorBox[2] = 50.0/255.0;
+      break;
     case 2:
     default:
        printf(" YOU HAVE CHOSEN ACDL\n ");
