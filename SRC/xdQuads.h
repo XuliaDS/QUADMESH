@@ -43,10 +43,6 @@ typedef struct{
   int verts[4], qadj[4], id;
 } Quad;
 
-typedef struct{
-  int    *area;
-  double *ratio;
-}mArea;
 
 typedef struct{
   int  *verts, *quads;
