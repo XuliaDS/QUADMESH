@@ -16,6 +16,7 @@
 
 #define PI     3.1415926535897931159979635
 
+#define qEPS   1.e-14
 
 #define EPS08  1.E-08
 
