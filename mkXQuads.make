@@ -7,7 +7,7 @@ TDIR  = BUILDS
 FILE  = xdQuads
 SFILE = $(FILE).c
 SDIR  = SRC
-DBG   = -g -pg
+DBG   = #-g -pg
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
 	$(CC) $(DBG) -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
 	-L$(LDIR) -legads -lm

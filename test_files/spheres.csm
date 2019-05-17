@@ -5,14 +5,13 @@ sphere          0.00      0.00      0.00      1.00
 
 
 #cut box
-     skbeg   -0.75 -1 -1 
-     linseg   0.75 -1 -1
-     linseg   0.75  1 -1
-     linseg  -0.75  1 -1
-     linseg  -0.75 -1 -1
+     skbeg   -1 -1 -1 
+     linseg   1 -1 -1
+     linseg   1 -1  1
+     linseg  -1 -1  1
+     linseg  -1 -1 -1
 skend
-extrude         0 0 1
-
+extrude         0 1.95 0 
 subtract 
 
 dump spherecut.egads

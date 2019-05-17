@@ -45,6 +45,17 @@ extrude         0 0 1
 
 subtract
 
+     skbeg   -0.8 -0.75 0
+     linseg  -0.6 -0.75 0
+     linseg  -0.8 0    0
+     linseg  -0.8 0    0
+     linseg  -0.8 -0.75 0
+skend
+extrude         0 0 1
+ subtract
+
+
+
 dump holes.egads
 
 end

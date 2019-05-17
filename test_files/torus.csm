@@ -7,28 +7,28 @@ despmtr   zcent     0.00
 despmtr   dxaxis    0.00
 despmtr   dyaxis    0.00
 despmtr   dzaxis    2.00
-despmtr   Rmajor    2.
-despmtr   Rminor    1.0
+despmtr   Rmajor    1.
+despmtr   Rminor    0.65
 
 #torus     xcent     ycent     zcent \
- #         dxaxis    dyaxis    dzaxis    Rmajor    Rminor
+ #        dxaxis    dyaxis    dzaxis    Rmajor    Rminor
 
 
 cylinder xcent ycent zcent dxaxis dyaxis dzaxis Rminor
 
-
 # cut box
-     skbeg   -1 -1 0
-     linseg   0 -1 0
-     linseg   0  0 0
-     linseg  -1  0 0
-     linseg  -1 -1 0
+     skbeg    0  0   -2
+     linseg   0  1.5 -2
+     linseg   0  1.5  1 
+     linseg   0  0    1
+     linseg   0  0   -2
 skend
 
-extrude         0 0 0.5
+extrude       1 0 0
 
-intersect 
-dump halCylinder.egads
+#subtract
+intersect
+dump toruscut.egads
 end
 #======================================#
 # automatically generated verification #
