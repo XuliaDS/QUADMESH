@@ -5,10 +5,8 @@
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
+#define REGULARBOUNDS
 
-#define AVERAGE   0
-#define ARCLENGTH 1
-#define INVEVAL   2
 #define CROSS(a,b,c)  c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
                       c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
                       c[2] = (a[0]*b[1]) - (a[1]*b[0])
