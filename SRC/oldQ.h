@@ -17,8 +17,6 @@
 
 #define EPS08  1.E-08
 
-#define eUV 0
-#define eXYZ 1
 #define SWAP                0
 #define COLLAPSE            1
 #define SPLIT               2
@@ -54,7 +52,7 @@ typedef struct{
 typedef struct {
   int      fID, oriQ, oriV, plotcount, totQ, totV,
   sizeV, sizeQ, *qIdx, *qAdj, **valence,
-  *qInv, *vType, *remQ, *remV, invsteps, regBounds, regBounds0;
+  *qInv, *vType, *remQ, *remV, invsteps, regBounds;
   ego      face;
   double   range[4],  *xyzs, *uvs;
   vStar **star;
