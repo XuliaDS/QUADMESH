@@ -17,8 +17,6 @@
 
 #define EPS08  1.E-08
 
-#define eUV 0
-#define eXYZ 1
 #define SWAP                0
 #define COLLAPSE            1
 #define SPLIT               2
@@ -29,8 +27,7 @@
 #define DOUBLESPLIT         4
 #define SWAPDOUBLESPLIT     5
 #define DOUBLESWAP          6
-#define DEG5   0.0872664625997165
-#define DEG175 3.05432619099008
+#define DEG175 3.1241
 #define QA0  0
 #define QA1  100
 #define QA2  10000
