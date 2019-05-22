@@ -51,7 +51,7 @@ typedef struct{
 typedef struct {
   int      fID, oriQ, oriV, plotcount, totQ, totV,
   sizeV, sizeQ, *qIdx, *qAdj, **valence,
-  *qInv, *vType, *remQ, *remV, invsteps, regBounds, regBounds0;
+  *qInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
   ego      face;
   double   range[4],  *xyzs, *uvs;
   vStar **star;
