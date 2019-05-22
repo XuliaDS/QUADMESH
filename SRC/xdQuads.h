@@ -16,7 +16,7 @@
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
-
+#define ANGCUT 3.0
 #define SWAP                0
 #define COLLAPSE            1
 #define SPLIT               2
@@ -73,7 +73,7 @@ typedef struct{
 
 extern int  EG_outLevel(const egObject *object);
 
-extern int  EG_createMeshMap(bodyQuad *bodydata, int uvtype);
+extern int  EG_createMeshMap(bodyQuad *bodydata);
 extern int  EG_meshRegularization(meshMap *qm);
 extern int  EG_makeQuadTess(bodyQuad bodydata, ego *quadTess);
 extern void EG_destroyMeshMap(bodyQuad *bodydata);
