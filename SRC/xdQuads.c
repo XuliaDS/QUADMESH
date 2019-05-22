@@ -4189,7 +4189,7 @@ int EG_meshRegularization(meshMap *qm)
                              qm->valence[qm->qIdx[4 * i + 3] -1][1] > 4) j = 3;
                     if (j >= 0) {
                         k = qm->qIdx[4 * i + (j + 1)%4];
-                        if (qm->vType[i-1] != -1)
+                        if (qm->vType[k-1] != -1)
                             k = qm->qIdx[4 * i + (j + 3)%4];
                         if (EG_validCollapse(qm, i + 1, i) == 1) {
 #ifdef DEBUG
