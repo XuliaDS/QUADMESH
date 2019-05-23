@@ -49,11 +49,11 @@ typedef struct{
 
 
 typedef struct {
-  int      fID, oriQ, oriV, plotcount, totQ, totV,
-  sizeV, sizeQ, *qIdx, *qAdj, **valence,
-  *qInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
+  int      fID, oriQ, oriV, plotcount, totQ, totV, pp,
+           sizeV, sizeQ, *qIdx, *qAdj, **valence,
+           *qInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
   ego      face;
-  double   range[4],  *xyzs, *uvs;
+  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea;
   vStar **star;
 } meshMap;
 

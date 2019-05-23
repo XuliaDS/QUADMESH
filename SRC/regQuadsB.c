@@ -1184,10 +1184,9 @@ int EG_createMeshMap(bodyQuad *bodydata, int uvtype)
       bodydata->qm[f]->valence[bodydata->qm[f]->qIdx[4 * j + q] - 1][0] = j + 1;
     }
     for (j = 0; j < len; j++) {
-      stat = setValence (bodydata->qm[f], j + 1);
+      stat = setValence(bodydata->qm[f], j + 1);
       if (stat != EGADS_SUCCESS) {
-        printf("In EG_createMeshMap :: set valence at %d is %d!!\n ",
-               j + 1, stat);
+        printf(" In EG_createMeshMap :: set valence at %d is %d!!\n ", j+1, stat);
         stat2 = stat;
         break;
       }
@@ -1196,10 +1195,10 @@ int EG_createMeshMap(bodyQuad *bodydata, int uvtype)
       if (bodydata->qm[f]->vType[j] == -1) continue;
       stat = EG_angleAtBoundaryVertex(bodydata->qm[f], j + 1, e4, &angle);
       if (stat != EGADS_SUCCESS || angle < EPS11) {
-        stat2   = EGADS_GEOMERR;
-        printf(" Stat in EG_angleAtBoundaryVertex %d angle %f\n ", stat, angle);
-        printf(" Vertices: %d %d %d \n ", j+ 1, e4[0], e4[1]);
-        break;
+        printf(" EGADS Warning: EG_angleAtBoundaryVertex - angle %f\n ", angle);
+        printf("                Vertices: %d %d %d \n ", j+1, e4[0], e4[1]);
+        bodydata->qm[f]->fID = 0;    // Turn off 
+        continue;
       }
       else if (angle < 0.85 * PI) bodydata->qm[f]->vType[j] = 2;
       else if (angle < 1.25 * PI) bodydata->qm[f]->vType[j] = 3;
@@ -1225,9 +1224,9 @@ int EG_createMeshMap(bodyQuad *bodydata, int uvtype)
 #ifdef DEBUG
     stat = checkMesh(bodydata->qm[f]);
     if (stat != EGADS_SUCCESS) {
-    printf("In EG_createMeshMap :: checkMesh at face %d -->%d!!\n",
-           f + 1, stat);
-    stat2 = stat;
+      printf(" In EG_createMeshMap :: checkMesh at face %d -->%d!!\n",
+             f + 1, stat);
+      stat2 = stat;
     }
 #endif
   }
@@ -3657,7 +3656,7 @@ int EG_makeQuadTess(bodyQuad bodydata, ego *quadTess)
   
   for (mQ = i = 0; i < bodydata.nfaces; i++) {
     if (bodydata.qm[i]->totQ > mQ) mQ = bodydata.qm[i]->totQ;
-    if (btess->tess2d[i].tfi != 1) continue;
+    if ((btess->tess2d[i].tfi != 1) && (bodydata.qm[i]->fID != 0)) continue;
     stat = EG_getTessFace(tess, i+1, &npts, &xyzs, &uvs, &ptype, &pindex,
                           &nt, &trs, &trc);
     if ((stat != EGADS_SUCCESS) || (nt == 0)) {
@@ -3696,7 +3695,7 @@ int EG_makeQuadTess(bodyQuad bodydata, ego *quadTess)
   
   /* fill in quads as triangle pairs */
   for (i = 0; i < bodydata.nfaces; i++) {
-    if (btess->tess2d[i].tfi == 1) continue;
+    if ((btess->tess2d[i].tfi == 1) || (bodydata.qm[i]->fID == 0)) continue;
     for (j = 0; j < bodydata.qm[i]->totQ; j++) {
       tris[6*j  ] = bodydata.qm[i]->qIdx[4*j  ];
       tris[6*j+1] = bodydata.qm[i]->qIdx[4*j+1];

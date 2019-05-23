@@ -19,9 +19,9 @@
 
 int main(int argc, char *argv[])
 {
-  int       round, i, j, f, stat, *nvert = NULL , *nquad = NULL, quad[4],x,
-      vt = 0, qt = 0, *segs = NULL, *tris = NULL, *nf = NULL, *piv = NULL, min;
-  float     focus[4], colorLine[3], colorBox[3];
+  int       round, i, j, k, f, stat, *nvert = NULL , *nquad = NULL, quad[4], x, nsegs,
+            vt = 0, qt = 0, *segs = NULL, *tris = NULL, *nf = NULL, *piv = NULL, min;
+  float     focus[4], colorLine[3], colorBox[3], colorEdge[3];
   double    size, box[6], bigBox[6],  *xyzs = NULL;
   char      gpname[34], *startapp, tmp[256], str[256];
   wvContext *cntxt;
@@ -75,7 +75,9 @@ int main(int argc, char *argv[])
        break;
 
   }
-
+  colorEdge[0] = colorLine[0];
+  colorEdge[1] = colorLine[1];
+  colorEdge[2] = colorLine[2];
 
   nvert = (int *)malloc(argc * sizeof (int));
   nquad = (int *)malloc(argc * sizeof (int));
@@ -111,7 +113,7 @@ int main(int argc, char *argv[])
 	  }
       }
   }
-  for ( round = 0 ; round < 2; round++) {
+  for (round = 0 ; round < 2; round++) {
       for ( f = 1 ; f < argc; f++ ) {
 	  fp = fopen(argv[piv[f]], "r");
 	  printf("openfile %s\n ", argv[piv[f]]);
@@ -127,7 +129,10 @@ int main(int argc, char *argv[])
 	  }
 	  vt  += nvert[f];
 	  qt  += nquad[f];
-	  printf(" FACE %d ---> QUADS %d\n ", piv[f], nquad[f]);
+	  if (round == 1)
+	    printf(" FACE %d ---> QUADS %d\n ", piv[f], nquad[f]);
+	  if ( xyzs != NULL) free(xyzs);
+	  if ( segs != NULL) free(segs);
 	  xyzs = (double *) malloc(3*nvert[f]*sizeof(double));
 	  tris = (int    *) malloc(6*nquad[f]*sizeof(int));
 	  segs = (int    *) malloc(8*nquad[f]*sizeof(int));
@@ -170,8 +175,9 @@ int main(int argc, char *argv[])
 		  if ( box[4] > bigBox[4] ) bigBox[4] = box[4];
 		  if ( box[5] > bigBox[5] ) bigBox[5] = box[5];
 	      }
+	      fclose(fp);
+	      continue;
 	  }
-	  if ( round == 0 ) continue;
 	  for ( j = 0 ; j < 6; j++ ) box[j] = bigBox[j];
 	  size = box[3]-box[0];
 	  if (size < box[4]-box[1]) size = box[4]-box[1];
@@ -206,12 +212,11 @@ int main(int argc, char *argv[])
 	      segs[8*i+6] = quad[3];
 	      segs[8*i+7] = quad[0];
 	  }
-	  fclose(fp);
 	  /* make the scene */
-          if ( f > 1 && nf[piv[f]] == nf[piv[f-1]])
-	  snprintf(gpname, 34, "Body %d Face %d%d", 1, nf[piv[f]], f);
-          else
-            snprintf(gpname, 34, "Body %d Face %d", 1, nf[piv[f]]);
+	  if ( f > 1 && nf[piv[f]] == nf[piv[f-1]])
+	    snprintf(gpname, 34, "Body %d Face %d%d", 1, nf[piv[f]], f);
+	  else
+	    snprintf(gpname, 34, "Body %d Face %d", 1, nf[piv[f]]);
 	  stat = wv_setData(WV_REAL64, nvert[f], (void *) xyzs,  WV_VERTICES, &items[0]);
 	  if (stat < 0) printf(" wv_setData = %d for %s/item 0!\n", stat, gpname);
 	  wv_adjustVerts(&items[0], focus);
@@ -229,12 +234,63 @@ int main(int argc, char *argv[])
 			     WV_ON|WV_ORIENTATION, 5, items);
 	  if (stat < 0)
 	    printf(" wv_addGPrim = %d for %s!\n", stat, gpname);
-	  free (xyzs);
-	  free (segs);
-	  free (tris);
-	  xyzs = NULL;
-	  segs = NULL;
-	  tris = NULL;
+	  j = fscanf(fp, "%d ", &nsegs);
+	  if (j != 1) {
+	      printf("\n ERROR: reading header\n\n");
+	      fclose(fp);
+	      return 1;
+	  }
+	  printf(" FACE %d has %d segmesnt \n", piv[f], nsegs);
+	  if (xyzs != NULL)free(xyzs);
+	  if (segs != NULL)free(segs);
+	  segs = (int    *) malloc(   2 *nsegs *sizeof(int));
+	  xyzs = (double *) malloc(3* 2* nsegs *sizeof(double));
+	  if ( segs == NULL || xyzs == NULL ) continue;
+	  k = 0;
+	  while(k < 2 * nsegs) {
+	      segs[k] = k + 1;
+	      j = fscanf(fp, "%lf %lf %lf",
+			 &xyzs[3 * k], &xyzs[3 * k + 1], &xyzs[3 * k + 2] );
+	      if (j != 3) {
+		  printf("\n ERROR: reading header\n\n");
+		  fclose(fp);
+		  return 1;
+	      }
+	      //printf(" P (%d) = %lf %lf %lf\n", k,
+		//     xyzs[3 * k], xyzs[3 * k + 1], xyzs[3 * k + 2] );
+	      k++;
+	      segs[k] = k + 1;
+	      j = fscanf(fp, "%lf %lf %lf",
+			 &xyzs[3 * k], &xyzs[3 * k + 1], &xyzs[3 * k + 2] );
+	      if (j != 3) {
+		  printf("\n ERROR: reading header\n\n");
+		  fclose(fp);
+		  return 1;
+	      }
+	   //   printf(" P (%d) = %lf %lf %lf\n", k,
+	     // 		     xyzs[3 * k], xyzs[3 * k + 1], xyzs[3 * k + 2] );
+	      k++;
+	  }
+	  snprintf(gpname, 34, "Body %d Edge %d", 1, piv[f]);
+	  stat = wv_setData(WV_REAL64, 2 * nsegs, (void *) xyzs, WV_VERTICES, &items[0]);
+	  if (stat < 0) printf(" wv_setData = %d for %s/item 0!\n", piv[f], gpname);
+	  wv_adjustVerts(&items[0], focus);
+	  stat = wv_setData(WV_REAL32, 1, (void *) colorEdge,  WV_COLORS,   &items[1]);
+	  if (stat < 0) printf(" wv_setData = %d for %s/item 1!\n", piv[f], gpname);
+	  stat = wv_setData(WV_INT32, 2*nsegs, (void *) segs, WV_INDICES,  &items[2]);
+	  if (stat < 0) printf(" wv_setData = %d for %s/item 2!\n", piv[f], gpname);
+	  stat = wv_addGPrim(cntxt, gpname, WV_LINE, WV_ON, 3, items);
+	  if (stat < 0) {
+	      printf(" wv_addGPrim = %d for %s!\n", stat, gpname);
+	  } else {
+	      if (cntxt != NULL)
+		if (cntxt->gPrims != NULL) {
+		    cntxt->gPrims[stat].lWidth = 1.5;
+		    if (wv_addArrowHeads(cntxt, stat, 0.05, 1, &nsegs) != 0)
+		      printf(" wv_addArrowHeads Error\n");
+		}
+	  }
+	  fclose(fp);
       }
   }
   /* start the server code */
@@ -254,9 +310,13 @@ int main(int argc, char *argv[])
   wv_cleanupServers();
 
   /* finish up */
-  free(xyzs);
-  free(tris);
-  free(segs);
+  if (xyzs  != NULL)free(xyzs);
+  if (tris  != NULL)free(tris);
+  if (segs  != NULL)free(segs);
+  if (piv   != NULL)free(piv);
+  if (nquad != NULL)free(nquad);
+  if (nvert != NULL)free(nvert);
+  if (nf    != NULL)free(nf);
   return 0;
 }
 
