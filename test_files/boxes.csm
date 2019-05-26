@@ -56,6 +56,6 @@ extrude         0 0 1
 
 
 
-dump holes.egads
+dump basicholes.egads
 
 end

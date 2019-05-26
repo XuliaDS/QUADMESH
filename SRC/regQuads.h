@@ -16,7 +16,8 @@
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
-#define ANGCUT 3.0
+#define ANGCUT      2.967059728390360
+#define COS_ANGCUT -9.848077530122080e-01
 #define SWAP                0
 #define COLLAPSE            1
 #define SPLIT               2
@@ -44,7 +45,8 @@ typedef struct{
 typedef struct{
   int  *verts, *quads;
   int   nV, nQ; // nV = n + 1 =  origin(1) + peaks (n)
-  int  *idxV, *idxQ;
+  int  *idxV, *idxQ, *areas;
+  double *angles, *ratios;
 } vStar;
 
 
