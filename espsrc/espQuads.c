@@ -163,34 +163,61 @@ static void gnuData(meshMap *qm, /*@null@*/ char *name)
 }
 
 
-static int wvsData(meshMap *qm, /*@null@*/ char *buffer)
+static void wvsData(meshMap *qm, /*@null@*/ char *buffer)
 {
-  int  i;
-  FILE *fil = NULL;
-  char aux[100];
+    int  i, j, k, n;
+    FILE *fil = NULL;
+    char aux[100];
 
-  if (buffer == NULL) {
-      snprintf(aux, 100, "wvsFace_%d_M_%d", qm->fID, qm->plotcount++);
-      fil = fopen(aux, "w");
-  } else {
-      fil = fopen (buffer, "w");
-      printf(" Writing in File %s  \n", buffer);
-  }
-  if (fil == NULL) return EGADS_MALLOC;
-  fprintf(fil, "%d %d\n", qm->totV, qm->totQ);
-  for (i = 0; i < qm->totV; i++) {
-      fprintf(fil, "%lf %lf %lf \n", qm->xyzs[3 * i    ],
-          qm->xyzs[3 * i + 1], qm->xyzs[3 * i + 2]);
-  }
-  fprintf(fil,"\n");
-  for (i = 0; i < qm->totQ; i++) {
-      fprintf(fil, "%d %d %d %d\n",  qm->qIdx[4 * i    ],
-          qm->qIdx[4 * i + 1], qm->qIdx[4 * i + 2],
-          qm->qIdx[4 * i + 3]);
-  }
-  fclose (fil);
-  return EGADS_SUCCESS;
+    if (qm->fID == 0 ) return;
+    if (buffer == NULL) {
+        snprintf(aux, 100, "wvsFace_%d_M_%d", qm->fID, qm->plotcount++);
+        fil = fopen(aux, "w");
+    } else {
+        fil = fopen (buffer, "w");
+        printf(" Writing in File %s  \n", buffer);
+    }
+    if (fil == NULL) {
+        printf(" I couldn't write in wvsData file !!!!\n ");
+        return ;
+    }
+    fprintf(fil, "%d %d\n", qm->totV, qm->totQ);
+    for (i = 0; i < qm->totV; i++) {
+        fprintf(fil, "%lf %lf %lf \n", qm->xyzs[3 * i    ],
+                qm->xyzs[3 * i + 1], qm->xyzs[3 * i + 2]);
+    }
+    fprintf(fil,"\n");
+    for (n = i = 0; i < qm->totQ; i++) {
+        fprintf(fil, "%d %d %d %d\n",  qm->qIdx[4 * i    ],
+                qm->qIdx[4 * i + 1], qm->qIdx[4 * i + 2],
+                qm->qIdx[4 * i + 3]);
+        if (qm->qAdj[4 * i    ] == -1 ) n++;
+        if (qm->qAdj[4 * i + 1] == -1 ) n++;
+        if (qm->qAdj[4 * i + 2] == -1 ) n++;
+        if (qm->qAdj[4 * i + 3] == -1 ) n++;
+    }
+    fprintf(fil,"%d\n", n );
+    for (k = i = 0; i < qm->totQ; i++) {
+        for (j = 0; j < 4; j++) {
+            if (qm->qAdj[4 * i + j] == -1 ) {
+                fprintf(fil, "%lf %lf %lf\n",
+                        qm->xyzs[3 * (qm->qIdx[4 * i + j]- 1)    ],
+                        qm->xyzs[3 * (qm->qIdx[4 * i + j]- 1) + 1],
+                        qm->xyzs[3 * (qm->qIdx[4 * i + j]- 1) + 2]);
+                fprintf(fil, "%lf %lf %lf\n",
+                        qm->xyzs[3 * (qm->qIdx[4 * i + (j + 1)%4]- 1)    ],
+                        qm->xyzs[3 * (qm->qIdx[4 * i + (j + 1)%4]- 1) + 1],
+                        qm->xyzs[3 * (qm->qIdx[4 * i + (j + 1)%4]- 1) + 2]);
+                k++;
+            }
+        }
+    }
+    if (k != n)
+      printf(" wvsData Error filling the edges segments!! %d != %d\n", k, n);
+    fclose(fil);
+    return ;
 }
+
 #endif
 
 
@@ -3578,11 +3605,7 @@ int EG_meshRegularization(meshMap *qm)
   }
 #ifdef REPORT
   snprintf(buffer,100, "wvsRegular_%d.txt", qm->fID);
-  stat = wvsData(qm, buffer);
-  if (stat != EGADS_SUCCESS) {
-    printf(" writing in wvs file %d !! \n ", stat);
-    return stat;
-  }
+  wvsData(qm, buffer);
   snprintf(buffer,100,"gnuRegular_%d.txt", qm->fID);
   gnuData(qm, buffer);
 #endif

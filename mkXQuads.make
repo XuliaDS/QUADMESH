@@ -4,7 +4,7 @@ include $(IDIR)/$(ESP_ARCH)
 LDIR  = $(ESP_ROOT)/lib
 ODIR  = obj
 TDIR  = BUILDS
-FILE  = xdQuads
+FILE  = regQuads
 SFILE = $(FILE).c
 SDIR  = SRC
 DBG   = -g -pg
