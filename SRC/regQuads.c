@@ -1468,10 +1468,9 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, 
         aAngle[j] = qm->star[v]->angles[j];
         if (aArea [j] >= QA3) continue;
         if (signbit(aRatio[j]) == 1) sra[1] = MIN(sra[1], aRatio[j] );
-        else{
-          if (qInfo[j] >= 0 || aRatio[j] < pass || bt == -1)
-               sra[2] = MIN (sra[2], aRatio[j] );
-        }
+        else if (aRatio[j] < pass || bt == -1 ||
+                  (bt == 2 && qInfo[j] >= 1)  ||
+                  (bt <= 1 && qInfo[j] >= 0)) sra[2] = MIN (sra[2], aRatio[j] );
     }
     if (corner >= 0 ) {
         EG_angAtBdVert(qm, qm->star[v]->verts[2 * corner + 2], vl, &angopt);
@@ -1494,7 +1493,7 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, 
             if (nt %2 == 0) nt /= 2;
         } else nt = qm->star[v]->nV;
         for (q = 0; q <= nt; q++) {
-            if (pass < 0.0 && q > 0) break;
+            if (q > 0 && ( pass < 0.0 || qm-> star[v]->nQ == 3)) break;
             uv[2] = uv[0];
             uv[3] = uv[1];
             updateVertex(qm, vID, uv);
@@ -1536,13 +1535,15 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, 
                 EG_centroid(qm, 2, vl, &uv[2], 0);
             } else  {
                 if (q - 1 >= qm->star[v]->nQ ||
-                    qm->star[v]->nQ == 3) break;
+                   (ja == QA0 && (sra[2] > 0.25 ||
+                    (sra[2] > 0.1 && full == 3 )))) break;
                 vl[0] = v + 1;
                 i     = 1;
                 for (k = 0; k < qm->star[v]->nQ; k++) {
                     j = qm->star[v]->verts[2 * k + 1] -1;
                     if (k == q - 1 || k == q ||
-                            qm->vType[j] * qm->valence[j][2] == -2 ) continue;
+                            qm->vType[j] * qm->valence[j][2] == -2 |
+                            qm->vType[j] > 0) continue;
                     vl[i++] = j + 1;
                 }
                 EG_centroid(qm, i, vl, &uv[2], 0);
@@ -1557,11 +1558,9 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, 
             for (j = 0; j < qm->star[v]->nQ; j++) {
                 if (qm->star[v]->areas[j] >= QA3) continue;
                 if (signbit(qm->star[v]->ratios[j]) == 1) srb[1] = MIN(srb[1], qm->star[v]->ratios[j]);
-                else{
-                    if (qInfo[j] >= bt || qm->star[v]->ratios[j]< 0.25  ||
-                            qm->star[v]->nQ != 4)
-                        srb[2] = MIN (srb[2], qm->star[v]->ratios[j]);
-                }
+                else if (qm->star[v]->ratios[j] < pass || bt == -1 ||
+                        (bt == 2 && qInfo[j] >= 1)  ||
+                        (bt <= 1 && qInfo[j] >= 0)) srb[2] = MIN (srb[2], qm->star[v]->ratios[j] );
             //    printf("BT %d QT %d RATIO %lf  SRA %lf\n", bt, qInfo[j], qm->star[v]->ratios[j], srb[2]);
             }
             if (corner >= 0 ) {
@@ -1634,8 +1633,11 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, 
                 } else if (sra[1] < 0.0 || srb[2] > sra[2]) k = 1;
             } else {
                 if (report == 1) printf(" LOOKING CAREFULLY :: FULL %d \n", full);
-                if (full == 3 && q == 0 && srb[0] > 0.6 && srb[2] > 0.25 ) k = 2;
-                if (srb[2] < pass || sra[2] < pass) {
+                if ( q== 0 && la == -1) {
+                    if (full != 3 && srb[0] > 0.4 && srb[2] > 0.25 ) k = 2;
+                    else if (full == 3 && srb[0] > 0.25 && srb[2] > 0.1 ) k = 2;
+                }
+                else if (srb[2] < pass || sra[2] < pass) {
                     if  (srb[2] > sra[2]) k = 1;
                     else continue;
                 }
@@ -1931,7 +1933,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
     double pos[18], uv[2];
     char buffer[100];
 
-    if (fullReg >= 2) report = 1;
+    if (fullReg >= 20) report = 1;
     else report = 0;
 #ifdef DEBUG
     report = 1;
