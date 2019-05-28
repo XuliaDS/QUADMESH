@@ -53,6 +53,9 @@ int main(int argc, char *argv[])
        colorLine[0] = 0.2;
        colorLine[1] = 0.0;
        colorLine[2] = 0.2;
+       colorEdge[0] = colorLine[0];
+       colorEdge[1] = colorLine[1];
+       colorEdge[2] = colorLine[2];
        break;
     case 3:
       printf(" YOU HAVE CHOSEN REVERSED ACDL\n ");
@@ -62,6 +65,7 @@ int main(int argc, char *argv[])
       colorBox[0] = 138.0/255.0;
       colorBox[1] = 23.0/255.0;
       colorBox[2] = 50.0/255.0;
+
       break;
     case 2:
     default:
@@ -72,12 +76,14 @@ int main(int argc, char *argv[])
        colorLine[0] = 138.0/255.0;
        colorLine[1] = 23.0/255.0;
        colorLine[2] = 50.0/255.0;
+       colorEdge[0] = 179.0 / 255.0;
+       colorEdge[1] = 0.0;
+       colorEdge[2] = 0.0;
+
        break;
 
   }
-  colorEdge[0] = colorLine[0];
-  colorEdge[1] = colorLine[1];
-  colorEdge[2] = colorLine[2];
+
 
   nvert = (int *)malloc(argc * sizeof (int));
   nquad = (int *)malloc(argc * sizeof (int));

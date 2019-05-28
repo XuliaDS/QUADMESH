@@ -1128,14 +1128,14 @@ int EG_createMeshMap(bodyQuad *bodydata, int uvtype)
     bodydata->qm[f]->remV[0]  = 0;
     bodydata->qm[f]->invsteps = 0;
     for (j = 0; j < 2 * len; j++) {
-      bodydata->qm[f]->valence[j] = (int *) EG_alloc(sizeof(int));
-      bodydata->qm[f]->valSize[j] = 1;
-      if (bodydata->qm[f]->valence[j] == NULL) {
-        stat2 = EGADS_MALLOC;
-        continue;
-      }
+        bodydata->qm[f]->valence[j] = (int *) EG_alloc(sizeof(int));
+        bodydata->qm[f]->valSize[j] = 1;
+        if (bodydata->qm[f]->valence[j] == NULL) {
+            stat2 = EGADS_MALLOC;
+            continue;
+        }
     }
-    bodydata->qm[f]->face    = bodydata->faces[f];
+    bodydata->qm[f]->face = bodydata->faces[f];
     stat   = EG_getRange(bodydata->qm[f]->face, bodydata->qm[f]->range, &j);
     for (j = 0; j < len; j++) {
       bodydata->qm[f]->vType  [j]         = ptype[j];

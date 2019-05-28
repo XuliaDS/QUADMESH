@@ -32,8 +32,8 @@
 #define QA0  0
 #define QA1  100
 #define QA2  10000
-#define QA3  1000000
-#define QACB 100000000   // crosses domain bounds: SUPER INVALID
+#define QA3  100000000
+#define QACB 1000000000  // crosses domain bounds: SUPER INVALID
 
 
 
