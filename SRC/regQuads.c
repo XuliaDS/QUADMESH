@@ -5,7 +5,7 @@
 #include "egads.h"
 #include "regQuads.h"
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define REPORT
@@ -1948,6 +1948,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
 #ifdef DEBUG
     report = 1;
 #endif
+
     mv      = (int   *)EG_alloc(qm->totV * sizeof(int));
     qlist   = (int   *)EG_alloc(qm->totQ * sizeof(int));
     if (mv == NULL || qlist == NULL) return EGADS_MALLOC;
@@ -1955,6 +1956,11 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
         if (nP  == 0 || pList == NULL) goto cleanup;
         for (kv = j = 0; j < nP; j++) {
             si = pList[j] - 1;
+            printf("%lf %lf %lf %d\n",
+                   		   qm->xyzs[3*si    ],
+                   		   qm->xyzs[3*si + 1],
+                   		   qm->xyzs[3*si + 2],
+                   		   si + 1 );
             if (qm->vType[si] == -2) continue;
             if (qm->vType[si] == -1 &&
                 inList (kv, mv, si) == -1 ) mv[kv++] = si;
@@ -1989,13 +1995,18 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
             uvxyz[5 * j + 3] = qm->xyzs[3 * mv[j] + 1];
             uvxyz[5 * j + 4] = qm->xyzs[3 * mv[j] + 2];
         }
+        printf(" ALL POINTS \n");
         for ( kq = k = 0 ; k < kv; k++) {
+            printf("%lf %lf %lf %d\n",
+            		   qm->xyzs[3*mv[k]    ],
+            		   qm->xyzs[3*mv[k] + 1],
+            		   qm->xyzs[3*mv[k] + 2],
+            		   mv[k] + 1 );
             for (i = 0; i < qm->star[mv[k]]->nQ; i++) {
                 if (kq == 0 || inList(kq, qlist, qm->star[mv[k]]->quads[i]) == -1)
                     qlist[kq++] = qm->star[mv[k]]->quads[i];
             }
         }
-
     } else {
         for (kv = i = 0 ; i < qm->totV; i++ ) {
             if ( qm->vType[i] != -1 ) continue;
