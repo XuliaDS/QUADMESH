@@ -53,22 +53,17 @@ static void meshCount(meshMap *qm, int *nI, int *nV, int *nQ)
 static void meshStats(meshMap *qm, int sweep)
 {
     int  i,len, val, intVal[100], boundVal[100];
-    char *buffer = NULL;
-    FILE *fout;
-    buffer = EG_alloc(sizeof(char));
-    if (buffer == NULL ) {
-        printf(" meshStats :: buffer VOID!\n");
-        return;
-    }
+    char buffer[200];
+    FILE *fout = NULL;
     if (sweep == 0)
-        snprintf(buffer,sizeof(char), "OriginalMeshStats_face_%d_.txt", qm->fID);
+        snprintf(buffer,200, "OriMeshStats_face_%d_.txt", qm->fID);
     else if (sweep == 10)
-        snprintf(buffer,sizeof(char), "PreprocessMeshStats_face_%d_.txt", qm->fID);
+        snprintf(buffer,200, "PreMeshStats_face_%d_.txt", qm->fID);
     else
-        snprintf(buffer,sizeof(char), "RegularlMeshStats_face_%d_.txt", qm->fID);
+        snprintf(buffer,200, "RegMeshStats_face_%d_.txt", qm->fID);
     fout = fopen(buffer, "w");
     if (fout == NULL) {
-        EG_free(buffer);
+        printf(" Error writing in file %s\n", buffer);
         return;
     }
     len = qm->totV;
@@ -86,6 +81,7 @@ static void meshStats(meshMap *qm, int sweep)
             }
         }
     }
+    printf(" Writing in %s \n", buffer);
     fprintf(fout,"---- TOTAL VERTICES %d TOTAL QUADS %d --------------\n",
             qm->totV - qm->remV[0], qm->totQ - qm->remQ[0]);
     fprintf(fout," INTERIOR VERTICES\n");
@@ -102,7 +98,6 @@ static void meshStats(meshMap *qm, int sweep)
     fprintf(fout,"\n\nMesh has %d QUADS, %d / %d irregular vertices (%.2f %% ) ============\n",
             val, i, len, (double) i * 100.0 / (double) len);
     fclose(fout);
-    EG_free(buffer);
 }
 
 
@@ -248,6 +243,8 @@ static void wvsData(meshMap *qm, /*@null@*/ char *buffer)
     fclose(fil);
     return ;
 }
+
+
 #endif
 
 
@@ -1220,10 +1217,18 @@ static int EG_vertexArea(meshMap *qm, int vID, int usePenalty, int report)
             if ( report == 1)
                 printf(" Tri ratio from  %lf  %lf ---> iv %d\n", vr[0], vr[1], iv%2);
             if (qm->star[vID-1]->areas[s] == QA0) {
+                if (usePenalty == 0 ) {
+                    vr[0] = vr[1] =0.0;
+                    if(tria[0] > qEPS && tria[2] > qEPS)
+                        vr[0] = MIN(tria[0] / tria[2], tria[2] / tria[0]);
+                    if(tria[1] > qEPS && tria[3] > qEPS)
+                        vr[1] = MIN(tria[1] / tria[3], tria[3] / tria[1]);
+                }
                 if (vr[1] > 4.0) vr[1] = tria[(k1 + 2)%4] / tria[k1];
                 if ( report == 1)
                     printf(" Tri ratio from  %lf  %lf ---> iv %d\n", vr[0], vr[1], iv%2);
                 if (usePenalty == 1) {
+
                     maiv  = MAX(MAX(ang[iv], ang[(iv+1)%4]), ang[(iv+3)%4]);
                     norm1 = MIN(MIN(ang[iv], ang[(iv+1)%4]), ang[(iv+3)%4]);
                     if (report == 1)
@@ -1243,6 +1248,11 @@ static int EG_vertexArea(meshMap *qm, int vID, int usePenalty, int report)
                 //}
             } else {
                 if (usePenalty == 0 ) {
+                    vr[0] = vr[1] =0.0;
+                    if(tria[0] > qEPS && tria[2] > qEPS)
+                        vr[0] = MIN(tria[0] / tria[2], tria[2] / tria[0]);
+                    if(tria[1] > qEPS && tria[3] > qEPS)
+                        vr[1] = MIN(tria[1] / tria[3], tria[3] / tria[1]);
                     if (qa[0] < qa[1] ) qm->star[vID-1]->ratios[s] = -vr[1];
                     else                qm->star[vID-1]->ratios[s] = -vr[0];
                 } else {
@@ -1372,7 +1382,7 @@ static int EG_vertexArea(meshMap *qm, int vID, int usePenalty, int report)
 }
 
 static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, int report) {
-    int q, v, j, i, k, *vl = NULL, ja, jb, update = 0, v1, v2, v3, corner,
+    int q, v, j, i, k, *vl = NULL, ja = 0, jb = 0, update = 0, v1, v2, v3, corner,
             la = -1, lb, nt, block = 0, round, doublet = 0, bt = -1;
     double uv[6], sra[3], srb[3], *aAngle = NULL, *aRatio = NULL, angerr[2] , angopt =0.0;
     int *qInfo = NULL, *aArea = NULL;
@@ -1462,7 +1472,7 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int pen, int full, 
     uv [5] = uv[1];
     sra[0] = sra[1] = sra[2] = 1.0;
     ja = EG_vertexArea(qm, vID, pen, report);
-    for (j = 0 ;j < qm->star[v]->nQ; j++ ) {
+     for (j = 0 ;j < qm->star[v]->nQ; j++ ) {
         aArea [j] = qm->star[v]->areas [j];
         aRatio[j] = qm->star[v]->ratios[j];
         aAngle[j] = qm->star[v]->angles[j];
@@ -1961,6 +1971,11 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
                 if (qm->vType[v] == -1 && inList (kv, mv, v) == -1 ) mv[kv++] = v;
             }
         }
+        if ( kv == 0 ) {
+            EG_free(mv);
+            EG_free(qlist);
+            return EGADS_SUCCESS;
+        }
         itMax = 5;
         uvxyz = (double*)EG_alloc(5 * kv * sizeof(double));
         if ( uvxyz == NULL ) {
@@ -2040,7 +2055,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
         if (it >= itMax - 5 && fullReg > 0 ) fullReg = 3;
         if (fullReg == 3 && it >= itMax - 4 ) pass = 0.2;
         for (j = k = 0 ; k < kv; k++) {
-            if (qm->vType[qm->valence[mv[k]][3]-1] >=4)
+            if (qm->vType[qm->valence[mv[k]][3]-1] == -1 ) continue;
                 area[k] = EG_placeVertex(qm,  mv[k] + 1, pass, 1, fullReg, report);
             j      += area[k];
             area[k] = MIN(area[k], 0);
@@ -2141,15 +2156,16 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
     printf(" EG_makeValidMesh stat %d\n", stat);
     gnuData(qm, NULL);
 #endif
+#ifdef REPORT
+    if ( fullReg >= 2 )
+        printf(" Face %d -->FINAL MESH %d\n", qm->fID, stat);
+#endif
 cleanup:
     EG_free(uvxyz);
     EG_free(mv);
     EG_free(area);
     EG_free(qlist);
-#ifdef REPORT
-    if ( fullReg >= 2 )
-        printf(" Face %d -->FINAL MESH %d\n", qm->fID, stat);
-#endif
+
     return stat;
 }
 
@@ -4249,6 +4265,153 @@ static int EG_cleanNeighborhood(meshMap *qm, int qID,  int transfer,
 }
 
 
+
+#ifdef REPORT
+
+static void meshProperties (meshMap *qm, int sweep )
+{
+    int j, k, i, v[4], quarts[8], area, n, Nx = 6;
+    double minT, maxT, minR, maxR, uv0[2], uv1[2], uv2[2], uv3[2], p[18];
+    FILE *fil =  NULL;
+    char buffer[100];
+
+    if (sweep == 0)
+        snprintf(buffer,100, "InitialMeshProperties_%d.txt", qm->fID);
+    else
+        snprintf(buffer,100, "finalMeshProperties_%d.txt", qm->fID);
+    fil = fopen(buffer,"w");
+    if (fil == NULL ) {
+        printf(" meshProperties Error writing in file %s\n", buffer);
+        return;
+    }
+    minT = 2.0 * PI; maxT = 0.0;
+    minR = 1.0; maxR = 0.0;
+    quarts[0] = quarts[1] = quarts[2] = quarts[3] = 0;
+    quarts[4] = quarts[5] = quarts[6] = quarts[7] = 0;
+    for (k = 0 ; k < qm->totV; k++) {
+        if (qm->vType[k] == -2) continue;
+        area = EG_vertexArea(qm, k + 1, 0, 0);
+        for ( j = 0; j < qm->star[k]->nQ; j++) {
+            if (qm->star[k]->quads[j] == -1) continue;
+            minT = MIN(minT, qm->star[k]-> angles[j]);
+            maxT = MAX(maxT, qm->star[k]-> angles[j]);
+            minR = MIN(minR, qm->star[k]-> ratios[j]);
+            maxR = MAX(maxR, qm->star[k]-> ratios[j]);
+            if     (qm->star[k]-> angles[j] < (15. /180. * PI)) quarts[0]++;
+            else if(qm->star[k]-> angles[j] < (40. /180. * PI)) quarts[1]++;
+            else if(qm->star[k]-> angles[j] < (155./180. * PI)) quarts[2]++;
+            else                                                quarts[3]++;
+            if     (qm->star[k]-> ratios[j] < 0.1 ) quarts[4]++;
+            else if(qm->star[k]-> ratios[j] < 0.25) quarts[5]++;
+            else if(qm->star[k]-> ratios[j] < 0.6 ) quarts[6]++;
+            else                                    quarts[7]++;
+        }
+    }
+    printf("\n\n FACE %d ---> MIN MAX ANGLES (%lf %lf)   MIN MAX RATIOS (%lf  %lf )\n",
+           qm->fID, minR, maxT, minR, maxR);
+    printf("Vertices by angles : \n"
+           " [0, 15] = %d [15,40] = %d [40, 155] = %d [155, 180] = %d  \n",
+           quarts[0] ,quarts[1] ,quarts[2],quarts[3]);
+    printf("Vertices by triangle aspect ratio : \n"
+           " [0, 0.1] = %d [0.1, 0.25] = %d [0.26,0.6] %d [0.6,1] = %d\n",
+           quarts[5] ,quarts[5] ,quarts[6], quarts[7]);
+    if (fil) {
+        fprintf(fil, "\n\n #FACE %d ---> MIN MAX ANGLES (%lf %lf)   MIN MAX RATIOS (%lf  %lf )\n",
+               qm->fID, minR, maxT, minR, maxR);
+        fprintf(fil, "#Vertices by angles : \n"
+               " #[0, 15] = %d [15,40] = %d [40, 155] = %d [155, 180] = %d  \n",
+               quarts[0] ,quarts[1] ,quarts[2],quarts[3]);
+        fprintf(fil, "#Vertices by triangle aspect ratio : \n"
+               " #[0, 0.1] = %d [0.1, 0.25] = %d [0.26,0.6] %d [0.6,1] = %d\n",
+               quarts[5] ,quarts[5] ,quarts[6], quarts[7]);
+    }
+    for (k = 0 ; k < qm->totQ; k++) {
+        minT = 2.0 * PI; maxT = 0.0;
+        minR = 1.0;      maxR = 0.0;
+        for ( i = 0 ; i < 4; i++) {
+            v[i] = qm->qIdx[4 * k + i] -1;
+            if (qm->vType[v[i]] == -2) break;
+            for (j = 0 ; j < qm->star[v[i]]->nQ; j++)
+                if (qm->star[v[i]]->quads[j] == k + 1) break;
+            minT = MIN(minT, qm->star[v[i]]-> angles[j]);
+            maxT = MAX(maxT, qm->star[v[i]]-> angles[j]);
+            minR = MIN(minR, qm->star[v[i]]-> ratios[j]);
+            maxR = MAX(maxR, qm->star[v[i]]-> ratios[j]);
+        }
+        uv0[0] = qm->uvs[2 * v[0]    ];
+        uv0[1] = qm->uvs[2 * v[0] + 1];
+        uv1[0] = qm->uvs[2 * v[1]    ];
+        uv1[1] = qm->uvs[2 * v[1] + 1];
+        for (n = 0; n <= Nx; n++) {
+            uv3[0] = uv0[0] + (qm->uvs[2 * v[3]    ] - qm->uvs[2 * v[0]    ]) * n / Nx;
+            uv3[1] = uv0[1] + (qm->uvs[2 * v[3] + 1] - qm->uvs[2 * v[0] + 1]) * n / Nx;
+            if (EG_evaluate(qm->face, uv3, p) != EGADS_SUCCESS) continue;
+            fprintf(fil,"%f %f %f %f %f %f %f %d \n",
+                    p[0], p[1], p[2], minT* 180.0 / PI,
+                    maxT* 180.0 / PI, minR, maxR, k + 1);
+            uv3[0] = uv1[0] + (qm->uvs[2 * v[2]    ] - qm->uvs[2 * v[1]    ]) * n / Nx;
+            uv3[1] = uv1[1] + (qm->uvs[2 * v[2] + 1] - qm->uvs[2 * v[1] + 1]) * n / Nx;
+            if (EG_evaluate(qm->face, uv3, p) != EGADS_SUCCESS) continue;
+            fprintf(fil,"%f %f %f %f %f %f %f %d\n\n\n",
+                    p[0], p[1], p[2], minT* 180.0 / PI,
+                    maxT* 180.0 / PI, minR, maxR, k +1);
+        }
+        uv1[0] = qm->uvs[2 * v[3]    ];
+        uv1[1] = qm->uvs[2 * v[3] + 1];
+        for (n = 0; n <= Nx; n++) {
+            uv3[0] = uv0[0] + (qm->uvs[2 * v[1]    ] - qm->uvs[2 * v[0]    ]) * n / Nx;
+            uv3[1] = uv0[1] + (qm->uvs[2 * v[1] + 1] - qm->uvs[2 * v[0] + 1]) * n / Nx;
+            if (EG_evaluate(qm->face, uv3, p) != EGADS_SUCCESS) continue;
+            fprintf(fil,"%f %f %f %f %f %f %f %d\n",
+                    p[0], p[1], p[2], minT* 180.0 / PI,
+                    maxT* 180.0 / PI, minR, maxR, k + 1);
+            uv3[0] = uv1[0] + (qm->uvs[2 * v[2]    ] - qm->uvs[2 * v[3]    ]) * n / Nx;
+            uv3[1] = uv1[1] + (qm->uvs[2 * v[2] + 1] - qm->uvs[2 * v[3] + 1]) * n / Nx;
+            if (EG_evaluate(qm->face, uv3, p) != EGADS_SUCCESS) continue;
+            fprintf(fil,"%f %f %f %f %f %f %f %d\n\n\n",
+                    p[0], p[1], p[2], minT* 180.0 / PI,
+                    maxT* 180.0 / PI, minR, maxR, k + 1);
+        }
+        if (fil) fprintf(fil,"\n\n");
+    }
+    if (fil) fclose(fil);
+    minT = 2.0 * PI; maxT = 0.0;
+    minR = 1.0; maxR = 0.0;
+    quarts[0] = quarts[1] = quarts[2] = quarts[3] = 0;
+    quarts[4] = quarts[5] = quarts[6] = quarts[7] = 0;
+    for (k = 0 ; k < qm->totV; k++) {
+        if (qm->vType[k] < 0) continue;
+        area = EG_vertexArea(qm, k + 1, 0, 0);
+        for ( j = 0; j < qm->star[k]->nQ; j++) {
+            if (qm->star[k]->quads[j] == -1) continue;
+            minT = MIN(minT, qm->star[k]-> angles[j]);
+            maxT = MAX(maxT, qm->star[k]-> angles[j]);
+            minR = MIN(minR, qm->star[k]-> ratios[j]);
+            maxR = MAX(maxR, qm->star[k]-> ratios[j]);
+            if     (qm->star[k]-> angles[j] < (15. /180. * PI)) quarts[0]++;
+            else if(qm->star[k]-> angles[j] < (40. /180. * PI)) quarts[1]++;
+            else if(qm->star[k]-> angles[j] < (155./180. * PI)) quarts[2]++;
+            else                                                quarts[3]++;
+            if     (qm->star[k]-> ratios[j] < 0.1 ) quarts[4]++;
+            else if(qm->star[k]-> angles[j] < 0.25) quarts[5]++;
+            else if(qm->star[k]-> angles[j] < 0.6 ) quarts[6]++;
+            else                                    quarts[7]++;
+        }
+    }
+    minT *= 180.0 / PI;
+    maxT *= 180.0 / PI;
+    printf("AT THE BOUNDARY \nVertices by angles : \n"
+           " [0, 15] = %d [15,40] = %d [40, 155] %d [155,180] = %d \n",
+          quarts[0] ,quarts[1] ,quarts[2], quarts[3]);
+    printf("Vertices by triangle aspect ratio : \n"
+           " [0, 0.1] = %d [0.1, 0.25] = %d [0.26,0.6] %d [0.6,1] = %d\n",
+           quarts[5] ,quarts[5] ,quarts[6],  quarts[7]);
+}
+
+#endif
+
+
+
 int EG_meshRegularization(meshMap *qm)
 {
     int    i, j, k, s, q, stat = EGADS_SUCCESS,  ni = 0, n0 = 0;
@@ -4268,7 +4431,8 @@ int EG_meshRegularization(meshMap *qm)
     snprintf(buffer,100, "wvsInit_%d.txt", qm->fID);
     wvsData(qm, buffer);
     snprintf(buffer,100, "initMeshStats_%d.txt", qm->fID);
-    meshStats(qm, 10);
+    meshStats(qm, 0);
+    meshProperties(qm,0);
     qm->invsteps = 0;
     printf("*****************************************************************\n");
 #endif
@@ -4333,27 +4497,28 @@ int EG_meshRegularization(meshMap *qm)
                 if(qm->vType[i] != -1) continue;
                 if (EG_vertexArea(qm, i + 1, 0, 0) > QA2 ) ni++;
             }
-            qm->vInv = EG_alloc ((ni + 1) * sizeof (int));
-            if (qm->vInv == NULL) {
-                EG_free (skipQuad);
-                EG_free (qArea   );
-                qm->fID = 0;
-                return EGADS_MALLOC;
-            }
-#ifdef REPORT
-            printf(" INITIAL MESH HAS %d INVALID vertices \n", ni);
-#endif
-            for (ni = i = 0 ; i < qm->totV;i++ ) {
-                if(qm->vType[i] != -1) continue;
-                for ( j = 0 ; j < qm->star[i]->nQ; j++) {
-                    if (qm->star[i]->areas[j] > QA2 &&
-                        (ni == 0 || inList(ni, &qm->vInv[1], i + 1) == -1)) {
-                        qm->vInv[++ni] = i + 1;
-                        break;
+            if (ni > 0 ) {
+                qm->vInv = EG_alloc ((ni + 1) * sizeof (int));
+                if (qm->vInv == NULL) {
+                    EG_free (skipQuad);
+                    EG_free (qArea   );
+                    qm->fID = 0;
+                    return EGADS_MALLOC;
+                }
+
+                printf("Attention! face %d has initally %d INVALID vertex positions \n", qm->fID, ni);
+                for (ni = i = 0 ; i < qm->totV;i++ ) {
+                    if(qm->vType[i] != -1) continue;
+                    for ( j = 0 ; j < qm->star[i]->nQ; j++) {
+                        if (qm->star[i]->areas[j] > QA2 &&
+                                (ni == 0 || inList(ni, &qm->vInv[1], i + 1) == -1)) {
+                            qm->vInv[++ni] = i + 1;
+                            break;
+                        }
                     }
                 }
+                qm->vInv[0] = ni;
             }
-            qm->vInv[0] = ni;
         }
         n0 = 1; // only first round is allowed to have invalid quads (self int)
         if (qm->vInv != NULL && qm->vInv[0] > 0) {
@@ -4441,9 +4606,7 @@ int EG_meshRegularization(meshMap *qm)
         for (j = 0 ; j < qm->vInv[0]; j++ ) {
             if ( qm->vInv[ 1 + j ] == -2 ) continue;
             fprintf(stderr,"After Preprocessing face %d there are still invalid quads from the original tessellation "
-                           "that couldn't be eliminated. Mesh is in valid. Change parameters!!!! \n ", qm->fID);
-            k = 1;
-            break;
+                           "that couldn't be eliminated. Let's see what happens....!!!! \n ", qm->fID);
         }
         EG_free(qm->vInv);
         qm->vInv = NULL;
@@ -4656,7 +4819,8 @@ int EG_meshRegularization(meshMap *qm)
     snprintf(buffer,100, "wvsFin_%d.txt", qm->fID);
     wvsData(qm, buffer);
     snprintf(buffer,100, "finMeshStats_%d.txt", qm->fID);
-    meshStats(qm, 10);
+    meshStats(qm, 100);
+    meshProperties(qm,100);
     qm->invsteps = 0;
     printf("*****************************************************************\n");
     if (stat != EGADS_SUCCESS) printf("Deactivating face %d stat %d\n", qm->fID, stat);
@@ -4823,7 +4987,6 @@ int EG_makeQuadTess(bodyQuad bodydata, ego *quadTess)
     return EGADS_SUCCESS;
 }
 
-
 #ifdef STANDALONE
 int main(int argc, char *argv[])
 {
@@ -4897,10 +5060,10 @@ int main(int argc, char *argv[])
 
     /* fill our structure a body at at time */
     for (iBody = 0; iBody < nbody; iBody++) {
-     //   stat = EG_attributeAdd(bodies[iBody], ".qParams",
-     //    ATTRSTRING, 4, NULL, NULL, "off");
-      //  if (stat != EGADS_SUCCESS)
-     //   printf(" Body %d: attributeAdd = %d\n", iBody, stat);
+        stat = EG_attributeAdd(bodies[iBody], ".qParams",
+         ATTRSTRING, 4, NULL, NULL, "off");
+        if (stat != EGADS_SUCCESS)
+        printf(" Body %d: attributeAdd = %d\n", iBody, stat);
         EG_getTopology(bodies[iBody], &geom, &oclass,
                        &mtype, NULL, &j, &dum, &senses);
         if (mtype == WIREBODY) {
