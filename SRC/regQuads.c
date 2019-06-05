@@ -1147,12 +1147,9 @@ static int EG_vertexArea(meshMap *qm, int vID, int report)
             ang [k]  =  0.0;
             tria[k]  =  0;
             bv  [k]  = -1;
-            if (qV[k] + 1 == vID) {
-                iv = k;
-                if (qm->vType[qm->valence[qV[k]][3] -1] > 0) bv[k] = k;
-            }
-            if      (qm->vType[qV[k]] != -1) bv[k] = k;
-            else if (qm->vType[qm->valence[qV[k]][3] -1] > 0) bv[k] = k;
+            if (qV[k] + 1 == vID) iv = k;
+            if (qm->vType[qV[k]] != -1 ||
+                qm->vType[qm->valence[qV[k]][3] -1] > 0) bv[k] = k;
             if (qm->valence[qV[k]][2] * qm->vType[qV[k]] == -2) {
                 ori[k]    = 1;
                 doublet   = 1;
@@ -1186,8 +1183,9 @@ static int EG_vertexArea(meshMap *qm, int vID, int report)
                 else                              ang[k] = acos(dot);
                 if (DOT(vNormal, cross) < 0.0)    ang[k] = (2.0 * PI - ang[k]);
                 ma = MAX(ma, ang[k]);
-                if (qm->vType[qV[k]] >= 4 ||
-                    qm->vType[qm->valence[qV[k]][3] - 1] >= 4) mba = MAX(mba, ang[k]);
+                if ((qm->vType[qV[k]] > 0 && qm->bdAng[qV[k]] > PI) ||
+                    (qm->vType[qm->valence[qV[k]][3] - 1] > 0 &&
+                     qm->bdAng[qm->valence[qV[k]][3] - 1] > PI)) mba = MAX(mba, ang[k]);
             }
             if (ori[k] == -1) continue;
             selfint = 0;
@@ -1385,7 +1383,7 @@ static int EG_vertexArea(meshMap *qm, int vID, int report)
 static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int report) {
     int q, v, j, i, k, *vl = NULL, ja = 0, jb = 0, update = 0, v1, v2, v3, corner,
          vqp = 0, vqn = 0, la = -1, lb, nt, block = 0, round, doublet = 0, bt = -1;
-    double uv[6], sra[3], srb[3], *aAngle = NULL, *aRatio = NULL, angopt =0.0, angpen, errbd;
+    double uv[6], sra[3], srb[3], *aAngle = NULL, *aRatio = NULL, angopt =0.0, angpen, errbd, minaux;
     int *qInfo = NULL, *aArea = NULL;
     char buffer[100];
     int d1, d2;
@@ -1453,45 +1451,33 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
         v1       = qm->star[v]->verts[qm->star[v]->idxV[2 *i + 1]] - 1;
         v2       = qm->star[v]->verts[qm->star[v]->idxV[2 *i + 2]] - 1;
         v3       = qm->star[v]->verts[qm->star[v]->idxV[2 *i + 3]] - 1;
-        if (qm->vType[v1] > 0) {
-            if (qm->vType[v1] >= 4 && la == -1) {
-                la = 2 * i + 1;
+        if (qm->vType[v1] > 0 || qm->vType[v2] > 0 ||
+            qm->vType[v3] > 0) {
+            if (qm->bdAng[v1] > PI) {
                 qInfo[i] = 2;
-            } else {
-                EG_angAtBdVert(qm, v1 + 1, vl, &angopt);
-                if (angopt > PI) {
-                    qInfo[i] = 2;
-                    if (la == -1 ) la = 2 * i + 1;
-                }
+                if ( la == -1 ) la = 2 * i + 1;
             }
+            if (qm->bdAng[v2] > PI || qm->bdAng[v3] > PI) qInfo[i] = 2;
             qInfo[i] = MAX(qInfo[i], 1);
         }
-        if (qm->vType[v3] > 0) {
-            if (qm->vType[v3] >= 4 ) qInfo[i] = 2;
-            else {
-                EG_angAtBdVert(qm, v3 + 1, vl, &angopt);
-                if (angopt > PI) qInfo[i] = 2;
-            }
-            qInfo[i] = MAX(qInfo[i], 1);
-        }
-        if (qm->vType[v2] > 0 ) {
-            if (qm->vType[v2] >=4 ) qInfo[i] = 2;
-            qInfo[i] = MAX(qInfo[i], 1);
-        }
-        if (qm->vType[qm->valence[v1][3] -1] >= 4 ||
-            qm->vType[qm->valence[v2][3] -1] >= 4 ||
-            qm->vType[qm->valence[v3][3] -1] >= 4 ) qInfo[i] = MAX(qInfo[i], 1);
+        if ((qm->vType[qm->valence[v1][3] -1] > 0 &&
+             qm->bdAng[qm->valence[v1][3] -1] > PI ) ||
+            (qm->vType[qm->valence[v2][3] -1] > 0 &&
+             qm->bdAng[qm->valence[v2][3] -1] > PI ) ||
+            (qm->vType[qm->valence[v3][3] -1] > 0 &&
+             qm->bdAng[qm->valence[v3][3] -1] > PI ))   qInfo[i] = MAX(qInfo[i], 1);
         else if (qm->vType[qm->valence[v1][3] -1] > 0 ||
                  qm->vType[qm->valence[v2][3] -1] > 0 ||
                  qm->vType[qm->valence[v3][3] -1] > 0 ) qInfo[i] = MAX(qInfo[i], 0);
-        if (qm->vType[v2] == 2 || qm->vType[v2] >= 4) corner = i;
+        if (qm->vType[v2] > 0 &&
+           (qm->vType[v2] == 2 || qm->bdAng[v2] > PI )) corner = i;
         bt = MAX(bt, qInfo[i]);
     }
     uv [0] = qm->uvs[2 * v    ];
     uv [1] = qm->uvs[2 * v + 1];
     uv [4] = uv[0];
     uv [5] = uv[1];
-    sra[0] = sra[1] = sra[2] = sra[3] = 1.0;
+    sra[0] = sra[1] = sra[2] = sra[3] = minaux = 1.0;
     ja     = EG_vertexArea(qm, vID, report);
     angpen = 0.0;
      for (j = 0 ;j < qm->star[v]->nQ; j++ ) {
@@ -1501,18 +1487,25 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
         if (aArea [j] >= QA3) continue;
         if ( report == 1) printf(" BT %d QINFO %d \n", bt, qInfo[j]);
         if (signbit(aRatio[j]) == 1) sra[1] = MIN(sra[1], aRatio[j] );
-        else if (bt <= qInfo[j] || aRatio[j] < pass) sra[2] = MIN(sra[2], aRatio[j] );
+        else {
+            if (qInfo[j] >= bt ) minaux = MIN(minaux, aRatio[j]);
+            sra[2] = MIN(sra[2], aRatio[j] );
+        }
+        /*else if (bt <= qInfo[j] || aRatio[j] < pass) {
+            if (qInfo[j] >= bt ) minaux = MIN(minaux, aRatio[j]);
+            sra[2] = MIN(sra[2], aRatio[j] );
+        }*/
         angpen = MAX(angpen, aAngle[j]);
     }
     errbd = 1.0;
+    if ( minaux < pass && sra[2] < minaux ) sra[2] = minaux;
     if (corner >= 0 && qm->star[v]->nQ >= 4 ) {
-        EG_angAtBdVert(qm, qm->star[v]->verts[2 * corner + 2], vl, &angopt);
+        angopt = qm->bdAng[2 * corner + 2];
         if (angopt > PI) angopt = 2.0 * PI - angopt;
         errbd = fabs(angopt - qm->star[v]->angles[corner]);
         errbd = (PI - errbd)/ PI;
     } else if (la != -1 && qm->valence[qm->star[v]->verts[la]- 1][2] == 4) {
-        EG_angAtBdVert(qm, qm->star[v]->verts[la], vl, &angopt);
-        angopt = (2.0 * PI - angopt);
+        angopt = (2.0 * PI - qm->bdAng[qm->star[v]->verts[la]- 1]);
         vqp = qm->star[v]->verts[qm->star[v]->idxV[la + 1]];
         vqn = qm->star[v]->verts[qm->star[v]->idxV[la - 1]];
         if (qm->vType[vqp -1] > 0) vqp = vID;
@@ -1520,7 +1513,7 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
         EG_angleAtVnormalPlane(qm, qm->star[v]->verts[la], vqp, vqn, &errbd);
         if ( report == 1)
             printf("OPT ANGLE %lf  ANGLE %d %d %d is %lf ERRO %lf SCALED %lf  \n", angopt, qm->star[v]->verts[la], vqp, vqn, errbd,
-                   fabs(angopt - errbd), ( PI - fabs(angopt - errbd)) / PI );
+                   fabs(angopt - errbd), (PI - fabs(angopt - errbd)) / PI );
         errbd = fabs(angopt - errbd);
         errbd = (PI - errbd ) / PI ;
     }
@@ -1571,7 +1564,7 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
                 if (la != -1) {
                     lb = qm->star[v]->idxV [la + q];
                     if((abs(lb - la) < 3 || abs(lb - la) > nt - 1 - 3 ) ||
-                            (ja == QA0 && q % 2 == 1 && sra[2] > 0.1))  continue;
+                        (ja == QA0 && q % 2 == 1 && sra[2] > 0.1))  continue;
                     vl[0] = qm->star[v]->verts[la];
                     vl[1] = qm->star[v]->verts[lb];
                     if (qm->vType[vl[1]-1] * qm->valence[vl[1]-1][2] == -2 ) continue;
@@ -1597,16 +1590,24 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
                 }
             }
             updateVertex(qm, vID, &uv[2]);
-            srb[0] = srb[1] = srb[2] = srb[3] = 1.0;
+            srb[0] = srb[1] = srb[2] = srb[3] = minaux = 1.0;
             jb     = EG_vertexArea(qm, vID, report);
             angpen = 0.0;
             for (j = 0; j < qm->star[v]->nQ; j++) {
                 if (qm->star[v]->areas[j] >= QA3) continue;
                 if (signbit(qm->star[v]->ratios[j]) == 1) srb[1] = MIN(srb[1], qm->star[v]->ratios[j]);
-                else if (bt <= qInfo[j] || qm->star[v]->ratios[j] < pass)
-                         srb[2] = MIN (srb[2], qm->star[v]->ratios[j] );
+                /*else if (bt <= qInfo[j] || qm->star[v]->ratios[j] < pass) {
+                    if (qInfo[j] >= bt ) minaux = MIN(minaux, qm->star[v]->ratios[j]);
+                    srb[2] = MIN (srb[2], qm->star[v]->ratios[j] );
+                }*/
+                else {
+                    if (qInfo[j] >= bt ) minaux = MIN(minaux, qm->star[v]->ratios[j]);
+                    srb[2] = MIN(srb[2], qm->star[v]->ratios[j] );
+                }
                 angpen = MAX (angpen, qm->star[v]->angles[j]);
             }
+            errbd = 1.0;
+            if ( minaux < pass && srb[2] < minaux ) srb[2] = minaux;
             errbd = 1.0;
             if (corner >= 0 ) {
                 errbd = fabs(angopt - qm->star[v]->angles[corner]);
@@ -1681,7 +1682,7 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
                 } else if (sra[1] < 0.0 || srb[2] > sra[2]) k = 1;
             } else {
                 if (report == 1) printf(" LOOKING CAREFULLY :: FULL %d \n", full);
-                if (q == 0) {
+                if (q == 0 && round == 0) {
                     if ( bt == 2) {
                         if ( pass >= 0.2 && srb[2] * srb[0] > pass &&
                              (sra[0] < srb[0] || sra[2] < srb[2] ||
@@ -1813,6 +1814,7 @@ int EG_createMeshMap(bodyQuad *bodydata)
             bodydata->qm[f]->remV    = NULL;
             bodydata->qm[f]->valence = NULL;
             bodydata->qm[f]->star    = NULL;
+            bodydata->qm[f]->bdAng   = NULL;
             bodydata->qm[f]->fID     = 0;
             continue;
         }
@@ -1830,6 +1832,7 @@ int EG_createMeshMap(bodyQuad *bodydata)
             bodydata->qm[f]->vType == NULL || bodydata->qm[f]->remQ    == NULL ||
             bodydata->qm[f]->remV  == NULL || bodydata->qm[f]->valence == NULL ||
             bodydata->qm[f]->star  == NULL) {
+            bodydata->qm[f]->fID = 0;
             stat2 = EGADS_MALLOC;
             continue;
         }
@@ -1841,14 +1844,16 @@ int EG_createMeshMap(bodyQuad *bodydata)
             bodydata->qm[f]->valence[j] = (int *) EG_alloc(3 * sizeof(int));
             if (bodydata->qm[f]->valence[j] == NULL) {
                 stat2 = EGADS_MALLOC;
+                bodydata->qm[f]->fID = 0;
                 continue;
             }
             bodydata->qm[f]->valence[j][2] = 0;
         }
         bodydata->qm[f]->face = bodydata->faces[f];
         stat   = EG_getRange(bodydata->qm[f]->face, bodydata->qm[f]->range, &j);
-        for (j = 0; j < len; j++) {
+        for (k = j = 0; j < len; j++) {
             bodydata->qm[f]->vType  [j]         = ptype[j];
+            if (ptype[j] >= 0 ) k++;
             bodydata->qm[f]->uvs    [2 * j    ] = uvs[2 * j    ];
             bodydata->qm[f]->uvs    [2 * j + 1] = uvs[2 * j + 1];
             if (uvs[2 * j    ] < bodydata->qm[f]->range[0] - 1.e-6 ||
@@ -1861,12 +1866,19 @@ int EG_createMeshMap(bodyQuad *bodydata)
                        bodydata->qm[f]->range[0],bodydata->qm[f]->range[1],
                        bodydata->qm[f]->range[2],bodydata->qm[f]->range[3]);
                 stat2 = EGADS_INDEXERR;
+                bodydata->qm[f]->fID = 0;
                 break;
             }
             bodydata->qm[f]->xyzs[3 * j    ] = xyzs[3 * j    ];
             bodydata->qm[f]->xyzs[3 * j + 1] = xyzs[3 * j + 1];
             bodydata->qm[f]->xyzs[3 * j + 2] = xyzs[3 * j + 2];
         }
+       bodydata->qm[f]->bdAng = (double *) EG_alloc(k * sizeof(double));
+       if (bodydata->qm[f]->bdAng == NULL ) {
+           bodydata->qm[f]->fID = 0;
+           stat2 = EGADS_MALLOC;
+           continue;
+       }
        if (stat2 != EGADS_SUCCESS) continue;
        for (j = 0; j < nquad; j++) {
            for (k = 0; k < 4; ++k)
@@ -1926,15 +1938,18 @@ int EG_createMeshMap(bodyQuad *bodydata)
                 printf("In EG_createMeshMap :: set valence at %d is %d!!\n ",
                        j + 1, stat);
                 stat2 = stat;
+                bodydata->qm[f]->fID = 0;
                 break;
             }
         }
         for (e4[0]= e4[1] = j = 0; j < len; j++) {
-            if (bodydata->qm[f]->vType[j] == -1) continue;
+            if (bodydata->qm[f]->vType[j] == -1) break;
             stat      = EG_angAtBdVert(bodydata->qm[f], j + 1, e4, &angle);
             if (stat != EGADS_SUCCESS || angle < EPS08 ) {
+#ifdef REPORT
                 printf(" FACE %d EG_angAtBdVert %d angle %f\n ",f + 1, stat, angle);
                 printf(" Vertices: %d %d %d \n ", j+ 1, e4[0], e4[1]);
+#endif
                 if (bodydata->qm[f]->vType[j] == 0)
                   bodydata->qm[f]->vType[j] = 2;
             }
@@ -1950,6 +1965,7 @@ int EG_createMeshMap(bodyQuad *bodydata)
                 bodydata->qm[f]->valence[j][1] = bodydata->qm[f]->valence[j][2] + 1;
             else if (bodydata->qm[f]->vType[j] >= 5)
                 bodydata->qm[f]->valence[j][1] = bodydata->qm[f]->valence[j][2] - 1;
+            bodydata->qm[f]->bdAng[j] = angle;
         }
         if (stat2 != EGADS_SUCCESS) {
             bodydata->qm[f]->fID = 0; // don't touch this face
@@ -4185,6 +4201,7 @@ void EG_destroyMeshMap(bodyQuad *bodydata)
             EG_free(bodydata->qm[i]->vType);
             EG_free(bodydata->qm[i]->star);
             EG_free(bodydata->qm[i]->vInv);
+            EG_free(bodydata->qm[i]->bdAng);
             EG_free(bodydata->qm[i]);
         }
     }
