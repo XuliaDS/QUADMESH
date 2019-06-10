@@ -2034,10 +2034,10 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
         //printf(" ALL POINTS \n");
         for ( kq = k = 0 ; k < kv; k++) {
           //  printf("%lf %lf %lf %d\n",
-            //		   qm->xyzs[3*mv[k]    ],
-                //	   qm->xyzs[3*mv[k] + 1],
-                //	   qm->xyzs[3*mv[k] + 2],
-                //	   mv[k] + 1 );
+            //     qm->xyzs[3*mv[k]    ],
+                //    qm->xyzs[3*mv[k] + 1],
+                //    qm->xyzs[3*mv[k] + 2],
+                //    mv[k] + 1 );
             for (i = 0; i < qm->star[mv[k]]->nQ; i++) {
                 if (kq == 0 || inList(kq, qlist, qm->star[mv[k]]->quads[i]) == -1)
                     qlist[kq++] = qm->star[mv[k]]->quads[i];

@@ -1,7 +1,0 @@
-SRC/forceQuads.c
-SRC/quadServer.c
-SRC/xdQuads.c
-SRC/xdQuads.h
-espsrc/regQuads.c
-espsrc/regQuads.h
-test_files/vAttr.c
