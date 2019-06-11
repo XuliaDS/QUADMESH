@@ -1,0 +1,11 @@
+
+ Using EGADS  1.15 with OpenCASCADE 6.8.1
+
+ EG_open           = 0
+ EGADS Warning: File ../../test_files/camberedWing.egads Not Found (EG_loadModel)!
+ EG_loadModel      = -1
+ EG_getBoundingBox = -2
+       BoundingBox = 0.000000 0.000000 0.000000
+                     0.000000 0.000000 0.000000
+ 
+ EG_getTopology = -2

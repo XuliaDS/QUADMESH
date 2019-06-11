@@ -15,7 +15,7 @@
 #define DOT(a,b)     (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
 
 #define PI     3.1415926535897931159979635
-
+#define PIEPS  3.2
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
