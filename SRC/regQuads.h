@@ -1,4 +1,4 @@
-#include <math.h>
+﻿#include <math.h>
 #include <string.h>
 
 
@@ -46,7 +46,7 @@ typedef struct{
 
 
 typedef struct{
-  int  *verts, *quads;
+  int  *verts, *quads, type; // -1 interior, 0 its vertices are linked to bounds, 1 links to bounds directly
   int   nV, nQ; // nV = n + 1 =  origin(1) + peaks (n)
   int  *idxV, *idxQ, *areas;
   double *angles, *ratios;
