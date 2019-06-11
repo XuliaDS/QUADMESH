@@ -1184,9 +1184,9 @@ static int EG_vertexArea(meshMap *qm, int vID, int report)
           if(tria[k1] > qEPS && tria[(k1 + 2)%4] > qEPS)
             vr[1] = MIN(tria[k1] / tria[(k1 + 2)%4], tria[(k1 + 2)%4] / tria[k1]);
           if (qm->star[vID-1]->areas[s] == QA0) {
-              if (report == 1) printf(" Tri ratio from  %lf  %lf ---> iv %d   maiv %lf min %lf (PI - min ) %lf \n", vr[0], vr[1], iv%2, maiv, norm1, PI -norm1);
               maiv  = MAX(MAX(ang[iv], ang[(iv+1)%4]), ang[(iv+3)%4]);
               norm1 = MIN(MIN(ang[iv], ang[(iv+1)%4]), ang[(iv+3)%4]);
+              if (report == 1) printf(" Tri ratio from  %lf  %lf ---> iv %d   maiv %lf min %lf (PI - min ) %lf \n", vr[0], vr[1], iv%2, maiv, norm1, PI -norm1);
               dot = maiv;
               if (PI - norm1 > maiv && PI - norm1 > ANGCUT) dot = PI - norm1;
               pen = 1.0 - ERFC(ANGCUT, PI, dot); // penalty kicks when angle > ANGCUT : MAX ERRFC = 2 when angle = pi
@@ -1432,7 +1432,7 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
           (qm->vType[qm->valence[v2][3] -1] > 0 &&
            qm->bdAng[qm->valence[v2][3] -1] > PI ) ||
           (qm->vType[qm->valence[v3][3] -1] > 0 &&
-           qm->bdAng[qm->valence[v3][3] -1] > PI ))  qInfo[i] = MAX(qInfo[i], 1);
+           qm->bdAng[qm->valence[v3][3] -1] > PI ))  qInfo[i] = MAX(qInfo[i], 2);
       else if (qm->vType[qm->valence[v1][3] -1] > 0 ||
                qm->vType[qm->valence[v2][3] -1] > 0 ||
                qm->vType[qm->valence[v3][3] -1] > 0) qInfo[i] = MAX(qInfo[i], 0);
@@ -1441,9 +1441,9 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
       bt = MAX(bt, qInfo[i]);
       printf(" QUAD %d INF %d\n", i, qInfo[i]);
       j = EG_nValenceCount(qm, qm->star[v]->quads[i], 4);
-      if (qInfo[i] <= 1 && j == 4 ) qInfo[qm->star[v]->nQ + i] = 1;
-      //if (qInfo[i] <= 1 && (j == 4 || qm->star[v]->nQ != 4)) qInfo[qm->star[v]->nQ + i] = 1;
-      else                                                   qInfo[qm->star[v]->nQ + i] = 0;
+      if (qInfo[i] == 2 ||  j == 4 || (qInfo[i] == 1 && qm->star[v]->nQ != 4))
+           qInfo[qm->star[v]->nQ + i] = 1;
+      else qInfo[qm->star[v]->nQ + i] = 0;
   }
   uv [0] = qm->uvs[2 * v    ];
   uv [1] = qm->uvs[2 * v + 1];
@@ -2737,7 +2737,9 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
   }
   *activity  = 0;
   i          = EG_quadVertIdx(qm, qC, centre);
-  if (qm->vType[centre - 1] != -1) {
+  if ( qm->vType[centre - 1] != -1 ||
+      (qm->vType[qm->valence[centre - 1][3] - 1] > 0 &&
+       qm->bdAng[qm->valence[centre - 1][3] - 1] > PI)) {
       i = (i+ 2)%4;
       centre = qm->qIdx[4 * (qC - 1) + i];
   }
@@ -2846,8 +2848,9 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
       qm->vType[oldQ[1] - 1] >= 4 ) doublet = 0;
   if (qm->vType[oldQ[2] - 1] == -1 && doublet == 0 &&
       qm->vType[qm->valence[oldQ[2]-1][3] - 1] < 4 ) {
+      printf(" UPDATING VERTEX %d \n", oldQ[2]);
       updateVertex(qm, oldQ[2], uv);
-      EG_placeVertex(qm, oldQ[2], 0.25,  0, 0);
+      EG_placeVertex(qm, oldQ[2], 0.25,  1, 0);
   }
   qm->vType[oldQ[0] - 1]  = -2; // -2 = removed
   qm->remQ[++qm->remQ[0]] = qC;
@@ -2864,9 +2867,9 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
 #endif
       EG_free(quad);
       if (qm->vType[oldQ[1] -1] == -1)
-        EG_placeVertex(qm, oldQ[1], 0.25,  0, 0);
+        EG_placeVertex(qm, oldQ[1], 0.25,  1, 0);
       if (qm->vType[oldQ[3] -1] == -1)
-        EG_placeVertex(qm, oldQ[3], 0.25, 0, 0);
+        EG_placeVertex(qm, oldQ[3], 0.25, 1, 0);
       return EGADS_SUCCESS;
   }
   if (EG_makeValidMesh(qm, 3, &oldQ[1], 0) == EGADS_SUCCESS) {
@@ -3159,7 +3162,7 @@ static int EG_collapse(meshMap *qm, int qID, int *activity, int forcing, int cID
                   val  [0] = qm->valence[links[0] - 1][1];
                   val  [1] = qm->valence[links[1] - 1][1];
                   if ((qm->valence[links[0] - 1][1] >= 5 ||
-                      qm->valence[links[1] - 1][1] >= 5 || i == 1) &&
+                       qm->valence[links[1] - 1][1] >= 5 || i == 1) &&
                       EG_validCollapse(qm, qID, vC) == 1) {
                       stat      = EG_mergeVertices(qm, qID, vC, &(*activity));
                       if (stat != EGADS_SUCCESS) {
@@ -3940,12 +3943,12 @@ return EGADS_SUCCESS;
           qm->vType[qm->valence[qm->qIdx[4 * (qID - 1) + 3]-1][3] - 1] == -1 &&
           (qs <= qm->minArea  && EG_nValenceCount(qm, qID, 3) > 0  &&
               qs < qm->avArea) ) {
-#ifdef DEBUG
+//#ifdef DEBUG
           printf(" QUAD AREA %lf MIN %lf AVERAGE %lf COLLAPSE QUAD %d \n",  qs, qm->minArea,
                  qm->avArea, qID);
           printQuad(qm, qID);
           gnuData(qm, NULL);
-#endif
+//#endif
 
           adl[0] = qm->qAdj[4 * (qID - 1)   ];
           adl[1] = qm->qAdj[4 * (qID - 1)+ 1];
@@ -4512,8 +4515,10 @@ int EG_meshRegularization(meshMap *qm)
           if (qm->qIdx[ 4 * i ] == -2) continue;
           qArea[i] = EG_quadSize(qm, i + 1, NULL);
           if (it == 0) {
+              if ( qArea[i] < minArea0) printf(" QUAD %d is smaller %lf < %lf!!!\n", i + 1, qArea[i], minArea0);
               minArea0 = MIN(qArea[i], minArea0);
               maxArea0 = MAX(qArea[i], maxArea0);
+
               avArea0 += qArea[i];
           }
           minArea = MIN(qArea[i], minArea);
@@ -4614,12 +4619,14 @@ break;
       }
       if (it < ITMAX / 2 && sq == qm->totQ) sq = 0 ;
   }
+  fprintf(stderr, "RATIO MIN MAX AREA %lf %lf  av %lf \n",
+  minArea ,maxArea , avArea);
   qm->minArea = minArea0;
   qm->maxArea = maxArea0;
-  qm->avArea =  avArea0;
+  qm->avArea  =  avArea0;
   fprintf(stderr, "RATIO MIN MAX AREA %lf %lf  %lf \n",
-  qm ->minArea ,qm -> maxArea ,qm ->minArea / qm -> maxArea );
-  if ( qm ->minArea / qm -> maxArea > 0.5 ) {
+  qm ->minArea ,qm -> maxArea ,qm ->avArea);
+  if ( qm ->minArea / qm -> avArea > 0.5 ) {
       qm->minArea = qm->maxArea = qm->avArea = 0.0;
   }
   EG_free (skipQuad);
