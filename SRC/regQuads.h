@@ -19,7 +19,7 @@
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
-#define ANGCUT 2.9
+
 
 #define SWAP                0
 #define COLLAPSE            1
@@ -58,7 +58,7 @@ typedef struct {
            sizeV, sizeQ, *qIdx, *qAdj, **valence,
            *vInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
   ego      face;
-  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
+  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng, angcut;
   vStar **star;
 } meshMap;
 
