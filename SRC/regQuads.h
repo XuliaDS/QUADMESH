@@ -1,10 +1,8 @@
-﻿#include <math.h>
-#include <string.h>
-
+#include<math.h>
+#include<string.h>
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
-
 #define ERFC(a,b,x) (0.5 * erfc(3.554147 * ((x -(0.5 * (a + b))) / (0.5 * (a - b)))))
 // NORMALIZED erfc = 0 at x = 1 and 1 at x = -1. min is better than max (eg angles) a < b
 // max is better than min (sizes) b < a

@@ -1,9 +1,6 @@
-﻿#ifdef STANDALONE
-#define REPORT
-#endif
-
-#include "egads.h"
+﻿#include "egads.h"
 #include "regQuads.h"
+
 
 //#define DEBUG
 
@@ -15,10 +12,10 @@
 #define REPORT
 
 #ifdef REPORT
-#include <time.h>
+  #include <time.h>
 #endif
 
-int NPC = 0;
+
 
 /* BASE-LEVEL FUNCTION */
 static int inList(int n, int *list, int p)
@@ -51,64 +48,6 @@ static void meshCount(meshMap *qm, int *nI, int *nV, int *nQ)
 
 
 #ifdef REPORT
-
-
-void sampleNormalPlane(double normal[], double point[], int vID, meshMap *qm ) {
-    double min[3], max[3], c, p[3], dt[3], r = 1.0;
-    int  i, j, k, nP;
-    FILE *f;
-    char name[32];
-    snprintf(name, sizeof(char) * 32, "CENTRE_%i_COUNT_%i", vID, NPC++);
-    printf(" SAMPLING NORMAL PLANE %s\n", name);
-    f = fopen(name,"w");
-    if ( f == NULL) return ;
-    nP = 20;
-    c = 0.0;
-    vID--;
-    for (i = 0 ; i < 3; ++i) {
-        min  [i] = qm -> xyzs[3*vID + i] -1; //qm -> xyzs[3*vID + i] - 100 *qm -> xyzs[3*vID + i] ;
-        max  [i] = qm -> xyzs[3*vID + i]  +1;//0.5;// qm -> xyzs[3*vID + i] + 100 *qm -> xyzs[3*vID + i] ;
-        if ( min[i] > max[i]) {
-            dt[0] = min[i];
-            min[i] = max[i];
-            max[i] = dt[0];
-        }
-        c       += normal[i] * point[i];
-    }
-    for (i = 0 ; i < 3; ++i)
-        dt[i] = (max[i] - min[i] )/(double)(nP -1);
-    fprintf(f,"%lf %lf %lf\n",point[0], point[1], point[2]);
-    for (i = 0 ; i < nP; ++i)
-    {
-        for ( j = 0 ; j < nP; ++j)
-        {
-            for ( k = 0 ; k < nP; ++k)
-            {
-                p[0] = min[0] + (double)i*dt[0];
-                p[1] = min[1] + (double)j*dt[1];
-                double aux = c - p[0] * normal[0] - p[1] * normal[1];
-                if ( fabs(normal[2]) > EPS08) p[2] = aux / normal[2];
-                else {
-                    p[2] = min[2] + (double)k*dt[2];
-                    if (fabs(normal[1]) < EPS08) {
-                        p[1] = min[1] + (double)j*dt[1];
-                        p[0] = point[0];
-                    }
-                    else {
-                        if (fabs(normal[0]) < EPS08) p[1] = point[1];
-                        else {
-                            aux  = c - p[0] * normal[0];
-                            p[1] = aux / normal[1];
-                        }
-                    }
-                }
-                fprintf(f,"%lf %lf %lf\n",p[0], p[1], p[2]);
-            }
-        }
-    }
-    fclose(f);
-}
-
 static void meshStats(meshMap *qm, int sweep)
 {
   int  i,len, val, intVal[100], boundVal[100];
@@ -358,6 +297,7 @@ static void printQuad (meshMap *qm, int id)
          xyz[0], xyz[1], xyz[2], id + 1, uv[0], uv[1]);
   printf(" \n\n---------------------------------------\n");
 }
+
 #ifdef DEBUG
 static void printQuadGroup(meshMap *qm, quadGroup qg)
 {
@@ -1146,7 +1086,7 @@ static int EG_vertexArea(meshMap *qm, int vID, int report)
               norm2 = nXYZ[6] * nXYZ[6] + nXYZ[7] * nXYZ[7] + nXYZ[8] * nXYZ[8];
               norm1 = sqrt(norm1 * norm2);
               if (norm1 < qEPS) { // point is singular: get du dv at EPS from point
-                  printf(" vertex %d NORM1 %lf < %lf\n", qV[k]+ 1,norm1, qEPS);
+                  if (report ==1 )printf(" vertex %d NORM1 %lf < %lf\n", qV[k]+ 1,norm1, qEPS);
                   stat  = EG_centroid(qm, 4, &qm->qIdx[4 * (qm->star[vID-1]->quads[s] - 1 ) ], uv, 0);
                   stat += EG_evaluate(qm->face, uv, nXYZ);
                   norm1 = nXYZ[3] * nXYZ[3] + nXYZ[4] * nXYZ[4] + nXYZ[5] * nXYZ[5];
@@ -1257,6 +1197,7 @@ static int EG_vertexArea(meshMap *qm, int vID, int report)
               continue;
           }
           bvp = MAX(qm->vType[qV[k]], bvp);
+          if (qm->bdAng[qV[k]] < PIEPS) continue;
           // check if we cross the domain boundary. This can happen even for valid quads!!
           for (lr[0] = lr[1] = i = 0; i < qm->star[qV[k]]->nQ; i++) {
               k1 = qm->star[qV[k]]->verts[2 * i + 1] - 1;
@@ -1817,7 +1758,6 @@ static int EG_placeVertex(meshMap *qm, int vID, double pass, int full, int repor
   }
   EG_free(vl);
   EG_free(qInfo);
-  if (ja == QA0 && sra[2] > pass && sra[0] > pass) return 1;
   return ja;
 }
 
@@ -2050,7 +1990,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
   double pos[18], uv[2];
   char buffer[100];
 
-  if (fullReg >= 1) report = 1;
+  if (fullReg >= 10) report = 1;
   else report = 0;
 #ifdef DEBUG
   report = 1;
@@ -2083,7 +2023,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
           EG_free(qlist);
           return EGADS_SUCCESS;
       }
-      itMax = 10;
+      itMax = 5;
       uvxyz = (double*)EG_alloc(5 * kv * sizeof(double));
       if ( uvxyz == NULL ) {
           EG_free(mv);
@@ -2184,7 +2124,6 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
       for (sum = k = 0 ; k < kv; k++) {
         if (qm->star[mv[k]] ->type<=0 ) continue;
           area[k] = EG_placeVertex(qm, mv[k] + 1, pass, fr, report);
-          if (area[k] == 1) area[k] = QA0;
           sum += area[k];
 #ifdef DEBUG
           if (area[k] >= QA2) printf(" Q %d is %d\n", mv[k], area[k]);
@@ -2193,7 +2132,6 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
       for (k = 0 ; k < kv; k++) {
           if (qm->star[mv[k]] ->type > 0 ) continue;
           area[k] = EG_placeVertex(qm, mv[k] + 1, pass, fr, report);
-          if (area[k] == 1) area[k] = QA0;
           sum += area[k];
 #ifdef DEBUG
           if (area[k] >= QA2) printf(" Q %d is %d\n", mv[k], area[k]);
@@ -2237,8 +2175,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
                   printf(" INVALID VERTEX %d --> %d\n", i + 1, qm->vInv[i+1]);
           }
       }
-      if (it == 0) continue;
-      if (sum == QA2 && fullReg == 0) break;
+      if (sum == QA0 && fullReg == 0) break;
   }
   if (sum < QA2 && fullReg == 0) sum = QA0;
   if (sum != QA0 ) {
@@ -2341,8 +2278,9 @@ static int EG_createQuadGroup(meshMap *qm, quadGroup *qg, int q0, int q1)
               vc [   k++  ] = qm->qIdx[4 * (q1 - 1) + j];
           }
       }
+      if ( k == 2) break;
   }
-  if (k != 2) {
+  if (k < 2) {
       printf("EG_createQuadGroup: Quad %d %d are not adjacent!!\n", q0, q1);
 #ifdef DEBUG
       printQuad(qm, q0);
@@ -2386,8 +2324,8 @@ static int EG_createQuadGroup(meshMap *qm, quadGroup *qg, int q0, int q1)
           qg->verts[4] = vaux[1];
           qg->verts[5] = vaux[2];
           aux          = qg->q[0];
-          qg->q[0]    = qg->q[1];
-          qg->q[1]    = aux;
+          qg->q[0]     = qg->q[1];
+          qg->q[1]     = aux;
       }
   }
   qg->vals[0] = qm->valence[qg->verts[0] -1][1];
@@ -3385,7 +3323,6 @@ static int EG_swapCollapse(meshMap *qm, quadGroup qg, int forcing, int *activity
       }
       else if (qg.vals[2] * qg.vals[5] == 15) {
           i3 = 2; if (qg.vals[2] != 3) i3 = 5;
-          printf(" SWAP WITH 2 !!!\n");
       }
       else if (qg.vals[1] * qg.vals[5] == 9 || qg.vals[2] * qg.vals[4] == 9) {
           v0        = qg.verts[0];
@@ -3415,15 +3352,12 @@ static int EG_swapCollapse(meshMap *qm, quadGroup qg, int forcing, int *activity
   } else return EGADS_SUCCESS;
   vOpp3 = (i3 + 3)%6;
   q5    = 0; if (vOpp3 > 3) q5 = 1;
-  printf(" SWAPPING i3 %d q5 %d \n", i3, q5);
-  if (EG_validCollapse(qm, qg.q[q5], qg.verts[i3]) == 0) return EGADS_SUCCESS;
-  qC    = qg.q[q5];
+  qC    = qg.q[(q5 + 1)%2];
+  if (EG_validCollapse(qm, qC, qg.verts[i3]) == 0) return EGADS_SUCCESS;
   vL5   = (vOpp3 + 1)%6;
   if (vL5%3 != 0) vL5 = (vOpp3 + 5)%6;
   if (qg.vals[vOpp3] == 3) return EGADS_SUCCESS;
   stat = EG_adjQtoPair(qm, qg.q[q5], qg.verts[vOpp3], qg.verts[vL5], adj);
-  printf(" ADJ TO PAIR %d %d FROM %d is %d\n",
-   qg.verts[vOpp3], qg.verts[vL5], qg.q[q5], adj[1]);
   if (stat != EGADS_SUCCESS || adj[1] == -1) return stat;
   i      = EG_quadVertIdx(qm, adj[1], qg.verts[vOpp3]);
   vL5adj = qm->qIdx[4 * (adj[1] - 1) + (i + 1)%4];
@@ -3433,10 +3367,10 @@ static int EG_swapCollapse(meshMap *qm, quadGroup qg, int forcing, int *activity
   stat      = EG_createQuadGroup(qm, &qg, qg.q[q5], adj[1]);
   if (stat != EGADS_SUCCESS) {
 #ifdef DEBUG
-printf("EG_swapCollapse before swap: EG_createQuadGroup -->%d !!\n", stat);
-printQuadGroup(qm, qg);
+      printf("EG_swapCollapse before swap: EG_createQuadGroup -->%d !!\n", stat);
+      printQuadGroup(qm, qg);
 #endif
-return stat;
+      return stat;
   }
   if (EG_validSwap(qm, qg.verts[0], qg.verts[3]) == 0) return EGADS_SUCCESS;
   for (swap = 0; swap < 6; swap++)
@@ -3458,7 +3392,7 @@ return stat;
   stat      = EG_collapse(qm, qC, &(*activity), 1, 0);
   if (stat != EGADS_SUCCESS || *activity == 0) {
 #ifdef DEBUG
-      printf("EG_swapCollapse after collapsing %d !!\n", stat);
+      printf("EG_swapCollapse after collapsing %d activity %d  !!\n", stat, *activity);
 #endif
       stat      = EG_createQuadGroup(qm, &qg, qg.q[0], qg.q[1]);
       for (swap = 0; swap < 6; swap++) if (qg.verts[swap] == v0) break;
@@ -4029,7 +3963,7 @@ static int EG_cleanQuad(meshMap *qm, int qID, int useAdj, int transfer,
   int stat, i, q, qadj, act = 0, adl[4], qp[2];
   int opBasic[3] = {COLLAPSE, SWAP, SPLIT};
   int opComp [7] = {SWAPCOLLAPSE, DOUBLECOLLAPSE, SWAPDOUBLECOLLAPSE, DOUBLESWAP,
-      SWAPSPLIT,    DOUBLESPLIT,    SWAPDOUBLESPLIT};
+                    SWAPSPLIT,    DOUBLESPLIT,    SWAPDOUBLESPLIT};
   double qs;
   quadGroup qg;
 
@@ -4040,8 +3974,20 @@ printf(" EG_cleanQuad %d stat %d\n", qID, stat);
 #endif
 return EGADS_SUCCESS;
   }
-  if (EG_nValenceCount(qm, qID, 4) == 4 ) return EGADS_SUCCESS;
+
+  i = qm->valence[qm->qIdx[4* (qID - 1)    ] - 1][1] *
+      qm->valence[qm->qIdx[4* (qID - 1) + 1] - 1][1] *
+      qm->valence[qm->qIdx[4* (qID - 1) + 2] - 1][1] *
+      qm->valence[qm->qIdx[4* (qID - 1) + 3] - 1][1];
+  if (i == 4 * 4 * 4 * 4) return EGADS_SUCCESS;
   if (transfer <= 0) {
+      if (qm->valence[qm->qIdx[4* (qID - 1)    ] - 1][1] > 5 ||
+          qm->valence[qm->qIdx[4* (qID - 1) + 1] - 1][1] > 5 ||
+          qm->valence[qm->qIdx[4* (qID - 1) + 2] - 1][1] > 5 ||
+          qm->valence[qm->qIdx[4* (qID - 1) + 3] - 1][1] > 5 ) {
+          opBasic[1] = SPLIT;
+          opBasic[2] = SWAP;
+      }
       for (i = 0; i < 3; i++) {
           stat       = EG_basicOperation(qm, qID, opBasic[i], &act);
           *activity += act;
@@ -4049,8 +3995,7 @@ return EGADS_SUCCESS;
               printf(" EG_cleanQuad Basic operation %d !!\n ", stat);
               return stat;
           }
-          if (act > 0 || qID < 0 || qm->qIdx[4 * (qID - 1)] == -2)
-            return EGADS_SUCCESS;
+          if (act > 0 || qID < 0 || qm->qIdx[4 * (qID - 1)] == -2) return EGADS_SUCCESS;
       }
   }
   if (useAdj == 0)  return EGADS_SUCCESS;
@@ -4147,8 +4092,7 @@ return EGADS_SUCCESS;
                      stat);
               return stat;
           }
-          if (act > 0 || qID < 0 || qm->qIdx[4 * (qID - 1)] == -2)
-            return EGADS_SUCCESS;
+          if (act > 0 || qID < 0 || qm->qIdx[4 * (qID - 1)] == -2) return EGADS_SUCCESS;
       }
   }
 
@@ -4159,7 +4103,7 @@ return EGADS_SUCCESS;
 static int EG_transferValences(meshMap *qm, int *qID, int try5533,
                                int *transfering, int *activity)
 {
-  int       i, j, swap = 0, stat, min, qAux[2];
+  int       i, j, q, adj, swap = 0, stat, min, qAux[2], bdq, qv35;
   quadGroup qg;
 
   *activity = 0;
@@ -4169,32 +4113,40 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
 #endif
       return EGADS_SUCCESS;
   }
+  bdq = EG_regBoundQuad(qm, qID[0]);
   if (*transfering == 0) {
       stat          = EG_cleanQuad(qm, qID[0], 1, 0, try5533, &(*activity));
       if (stat     != EGADS_SUCCESS || *activity > 0) {
           qID[0]    = -1;
           if (stat != EGADS_SUCCESS)
-            printf("EG_transferValences: EG_cleanQuad %d -->%d!!\n",
-                   qID[0], stat);
+              printf("EG_transferValences: EG_cleanQuad %d -->%d!!\n",
+              qID[0], stat);
           return stat;
       }
   }
-  if (qm->regBd == 1 && EG_regBoundQuad(qm, qID[0]) == 1) {
+  if (qm->regBd == 1 && bdq == 1) {
 #ifdef DEBUG
       printf(" EG_transferValences for quad %d is out of bounds or quad is regular!!\n ", qID[0]);
 #endif
       return EGADS_SUCCESS;
   }
-
+  j = qm -> valence[qm->qIdx[4 * (qID[0] - 1)    ] - 1][1] *
+      qm -> valence[qm->qIdx[4 * (qID[0] - 1) + 1] - 1][1] *
+      qm -> valence[qm->qIdx[4 * (qID[0] - 1) + 2] - 1][1] *
+      qm -> valence[qm->qIdx[4 * (qID[0] - 1) + 3] - 1][1];
+  qv35 = 0;
+  if (j % 15 == 0) {
+      qv35 = 1;
+      if (j % 9 == 0 || j % 25 == 0) qv35 = 2;
+  }
   if (qID[0] == -1 || qm->qIdx[4 * (qID[0] - 1)] == -2 ||
-      EG_nValenceCount(qm, qID[0], 4) == 4) return EGADS_SUCCESS;
-  for (j = 0; j < 4; j++) {
-      i = qm->qAdj[4 * (qID[0] - 1) + j];
-      if (i == -1 || i == qID[1] ||
-            (qm->regBd == 1 && EG_regBoundQuad(qm,      i) ==  1 &&
-                               EG_regBoundQuad(qm, qID[0]) == -1)) {
-          if (*transfering == 0 && EG_nValenceCount(qm, qID[0], 3) == 1 &&
-                                   EG_nValenceCount(qm, qID[0], 5) == 1 ) {
+           j ==  4 * 4 * 4 * 4) return EGADS_SUCCESS;
+  for (q   = 0; q < 4; q++) {
+      swap = 0;
+      adj  = qm->qAdj[4 * (qID[0] - 1) + q];
+      if (adj == -1 || adj == qID[1] ||
+         (qm->regBd == 1 && bdq == -1 &&  EG_regBoundQuad(qm, adj) ==  1 )) {
+          if (*transfering == 0 && qv35 == 1 ) {
               EG_collapse(qm, qID[0], &(*activity), 1, 0);
               if (stat     != EGADS_SUCCESS || *activity > 0) {
                   qID[0]    = -1;
@@ -4207,16 +4159,16 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
           continue;
       }
       if (*transfering == 0) {
-          stat      = EG_cleanQuad(qm, i, 1, 0, try5533, &(*activity));
+          stat      = EG_cleanQuad(qm, adj, 1, 0, try5533, &(*activity));
           if (stat != EGADS_SUCCESS || *activity > 0) {
               if (stat != EGADS_SUCCESS)
-                printf(" EG_TransferValence EG_cleanQuad -->%d !!\n ", stat);
+                  printf(" EG_TransferValence EG_cleanQuad -->%d !!\n ", stat);
               qID[0] = -1;
               return stat;
           }
       }
-      if (qm->qAdj[4 * (qID[0] - 1) + j] != i) continue;
-      stat = EG_createQuadGroup(qm, &qg, qID[0], i);
+      if (qm->qAdj[4 * (qID[0] - 1) + q] != adj) continue;
+      stat = EG_createQuadGroup(qm, &qg, qID[0], adj);
       if (stat != EGADS_SUCCESS) {
           printf(" Inside EG_transferValences EG_createQuadGroup %d !!\n", stat);
 #ifdef DEBUG
@@ -4224,17 +4176,13 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
 #endif
           return stat;
       }
-#ifdef DEBUG
-      printf(" TRANSFER GROUP Q0 %d Transferring %d try5533 %d\n", qID[0], try5533, *transfering);
-          printQuadGroup(qm, qg);
-#endif
       if (*transfering == 0 && qg.vals[0] * qg.vals[3] == 15 && qID[1] != -1) {
           j = 0;
           if (qg.q[j] == qID[0]) j = 1;
           qID[0] = qg.q[j];
           qID[1] = qg.q[(j + 1)%2];
           for (i = 0 ; i < 4; i++) {
-              j = qm->qIdx [4 * (qID[0] - 1 ) + i ] - 1;
+               j = qm->qIdx [4 * (qID[0] - 1 ) + i ] - 1;
               if (qm->vType[qm->valence[j][3] - 1] > 0) {
                   stat      = EG_collapse(qm, qID[0], &(*activity), 1, 0);
                   if (stat != EGADS_SUCCESS)
@@ -4246,49 +4194,17 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
           }
           return EG_transferValences(qm, qID, 0, &(*transfering), &(*activity));
       }
-      if (EG_validSwap(qm, qg.verts[0], qg.verts[3]) == 0) continue;
-      if          (qg.vals[0] * qg.vals[3] >= 20) min = 12;
+      if     (qg.vals[0] * qg.vals[3] >= 20) min = 12;
       else if (try5533 == 1 && *transfering == 0) {
           if      (qg.vals[0] * qg.vals[3] >= 25) min = 16;
           else if (qg.vals[0] * qg.vals[3] == 16) min =  9;
-      }else continue;/*if (qg.vals[1] * qg.vals[2]   ==  9 &&
-      qm->vType[qg.verts[4] -1] == -1 &&
-      qm->vType[qg.verts[5] -1] == -1 ) {
-          if (qg.vals[4] <= qg.vals[5]) swap = 1;
-          else swap = 2;
-          *transfering = 1;
-#ifdef DEBUG
-          printf(" SWAPPING TO SEPARATE 3-3!!! \n");
-          printQuadGroup(qm, qg);
-#endif
-      }
-      else if (qg.vals[3] * qg.vals[4]   ==  9 &&
-      qm->vType[qg.verts[1] -1] == -1 &&
-      qm->vType[qg.verts[2] -1] == -1 ) {
-          if (qg.vals[1] <= qg.vals[2]) swap = 1;
-          else swap = 2;
-          *transfering = 1;
-#ifdef DEBUG
-          printf(" SWAPPING TO SEPARATE 3-3!!! \n");
-          printQuadGroup(qm, qg);
-#endif
-      } else continue;*/
-      //if (swap == 0) {
-          if (     qg.vals[1] * qg.vals[4] <= min) swap = 1;
-          else if (qg.vals[2] * qg.vals[5] <= min) swap = 2;
-          else continue;
-      //}
-#ifdef DEBUG
-      printf("Transfer valences thru %d MIN %d REG BD %d  Q %d -- %d  Q %d -- %d \n ", swap, min,
-             qm->regBd, qg.q[0], EG_regBoundQuad(qm, qg.q[0]),
-             qg.q[1], EG_regBoundQuad(qm, qg.q[1]) ) ;
-      printQuadGroup(qm, qg);
-#endif
+      } else continue;
+      if (     qg.vals[1] * qg.vals[4] <= min) swap = 1;
+      else if (qg.vals[2] * qg.vals[5] <= min) swap = 2;
+      if (EG_validSwap(qm, qg.verts[0], qg.verts[3]) == 0 || swap == 0) continue;
       stat          = EG_swappingOperation(qm, qg, swap, &(*activity));
       if (stat     != EGADS_SUCCESS || *activity == 0) {
           if (stat != EGADS_SUCCESS)
-            printf(" EG_transferValences EG_swappingOperation stat %d activity %d !!\n",
-                   stat, *activity);
 #ifdef DEBUG
           printf(" EG_transferValences EG_swappingOperation stat %d activity %d !!\n",
                  stat, *activity);
@@ -4296,37 +4212,37 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
           return stat;
       }
       i        = 0;
-      if (min == 9 || min == 16) *transfering = 1;
-      else                       *transfering = 0;
+      if (min == 9 || min == 16 || *transfering == 2) *transfering = 1;
+      else                         *transfering = 0;
       if (qID[1] > 0 && qm->qIdx[4 * (qID[1] - 1)] != -1 &&
           qg.q[0] == qID[1]) i = 1;
       else if (EG_nValenceCount(qm,qg.q[0], 5) == 2 &&
-          EG_nValenceCount(qm,qg.q[1], 5) >= 1 &&
-          EG_nValenceCount(qm,qg.q[1], 3) == 1) i = 1;
+               EG_nValenceCount(qm,qg.q[1], 5) >= 1 &&
+               EG_nValenceCount(qm,qg.q[1], 3) == 1) i = 1;
       else if (EG_nValenceCount(qm,qg.q[1], 4) <
-          EG_nValenceCount(qm,qg.q[0], 4)) i = 1;
+               EG_nValenceCount(qm,qg.q[0], 4)) i = 1;
       qID[0] = qg.q[ i       ];
       qID[1] = qg.q[(i + 1)%2];
 #ifdef DEBUG
-printf(" ASSIGNED QUAS %d %d TRANSFER %d\n", qID[0], qID[1], *transfering);
+      printf(" ASSIGNED QUAS %d %d TRANSFER %d\n", qID[0], qID[1], *transfering);
 #endif
-if (*transfering == 1) {
-    for (j = 0; j < 2; j++) {
-        i         = 1;
-        qAux[0]   = qID[ j       ];
-        qAux[1]   = qID[(j + 1)%2];
-        stat      = EG_transferValences(qm, qAux, 0, &i, &min);
-        if (stat != EGADS_SUCCESS) {
-            printf(" EG_transferValences: separating valences after forcing %d!!\n",
-                   stat);
-            return stat;
-        }
-    }
-    *transfering = 0;
-    qID[0]       = qAux[0];
-    qID[1]       = qAux[1];
-}
-if (*activity > 0) break;
+      if (*transfering == 1) {
+          for (j = 0; j < 2; j++) {
+              i         = 1;
+              qAux[0]   = qID[ j       ];
+              qAux[1]   = qID[(j + 1)%2];
+              stat      = EG_transferValences(qm, qAux, 0, &i, &min);
+              if (stat != EGADS_SUCCESS) {
+                  printf(" EG_transferValences: separating valences after forcing %d!!\n",
+                  stat);
+                  return stat;
+              }
+          }
+          *transfering = 0;
+          qID[0]       = qAux[0];
+          qID[1]       = qAux[1];
+      }
+      if (*activity > 0) break;
   }
   return stat;
 }
@@ -4956,18 +4872,17 @@ break;
               for (q = 0; q < qm->totQ; q++) {
                   transfer = 0;
                   if (qm->qIdx[4 * q] == -2 || q + 1 == prevPair[0] ||
-                      q + 1 == prevPair[1]) continue;
+                  q + 1 == prevPair[1]) continue;
                   qPair[0]  = q + 1;
-                  qPair[1]  = -1;
-                  stat      = EG_transferValences(qm, qPair, k,
-                                                  &transfer, &activity);
+                  qPair[1]  =    -1;
+                  stat      = EG_transferValences(qm, qPair, k, &transfer, &activity);
                   if (stat     != EGADS_SUCCESS) {
                       printf("EG_meshRegularization:: EG_transferValences %d\n", stat);
                       qm->fID = 0;
                       return stat;
                   }
                   if (activity == 0 || qPair[0] < 0 ||
-                      qm->qIdx[4*(qPair[0]-1)] == -2) continue;
+                  qm->qIdx[4*(qPair[0]-1)] == -2) continue;
                   totActivity += activity;
                   for (j = 0; j < 20; j++) {
                       activity = 0;
@@ -5041,6 +4956,8 @@ break;
       }
       totActivity += activity;
   }
+  printf(" MESH BEFORE RESIXE FINAL ROUND \n");
+  gnuData(qm, NULL);
   stat      = resizeQm(qm);
   if (stat != EGADS_SUCCESS) {
       printf("EG_meshRegularization final resize %d !!\n", stat);
