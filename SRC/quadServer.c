@@ -1,4 +1,4 @@
-﻿#include<stdio.h>
+#include<stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
@@ -59,9 +59,9 @@ int main(int argc, char *argv[])
        break;
     case 3:
       printf(" YOU HAVE CHOSEN REVERSED ACDL\n ");
-      colorLine[0]  = 200.0/255.0;
-      colorLine[1]  = 20.0/255.0;
-      colorLine[2]  = 200.0/255.0;
+      colorLine[0]  = 255.0/255.0;
+      colorLine[1]  = 255.0/255.0;
+      colorLine[2]  = 255.0/255.0;
       colorBox[0] = 138.0/255.0;
       colorBox[1] = 23.0/255.0;
       colorBox[2] = 50.0/255.0;
@@ -70,9 +70,9 @@ int main(int argc, char *argv[])
     case 2:
     default:
        printf(" YOU HAVE CHOSEN ACDL\n ");
-       colorBox[0]  = 220.0/255.0;
-       colorBox[1]  = 220.0/255.0;
-       colorBox[2]  = 220.0/255.0;
+       colorBox[0]  = 255.0/255.0;
+       colorBox[1]  = 255.0/255.0;
+       colorBox[2]  = 255.0/255.0;
        colorLine[0] = 138.0/255.0;
        colorLine[1] = 23.0/255.0;
        colorLine[2] = 50.0/255.0;
