@@ -48,8 +48,8 @@ typedef struct{
 typedef struct{
   int  *verts, *quads, type; // -1 interior, 0 its vertices are linked to bounds, 1 links to bounds directly
   int   nV, nQ; // nV = n + 1 =  origin(1) + peaks (n)
-  int  *idxV, *idxQ, *areas;
-  double *angles, *ratios;
+  int  *idxV, *idxQ, *area;
+  double *angle, *ratio;
 } vStar;
 
 
@@ -58,7 +58,7 @@ typedef struct {
            sizeV, sizeQ, *qIdx, *qAdj, **valence,
            *vInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
   ego      face;
-  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
+  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng, angcut;
   vStar **star;
 } meshMap;
 
