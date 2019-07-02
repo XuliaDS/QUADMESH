@@ -1,4 +1,4 @@
-﻿#include "egads.h"
+#include "egads.h"
 #include "regQuads.h"
 
 
@@ -554,17 +554,18 @@ static int EG_buildStar(meshMap *qm, vStar **star, int vID)
       EG_free(quads);
       return EGADS_MALLOC;
   }
-  (*star)->nQ      = q;
-  (*star)->nV      = v;
-  (*star)->verts   = (int    *) EG_alloc(    v * sizeof(int));
-  (*star)->quads  = (int    *) EG_alloc(    q * sizeof(int));
-  (*star)->idxV     = (int    *) EG_alloc(2 * v * sizeof(int));
-  (*star)->idxQ    = (int    *) EG_alloc(2 * q * sizeof(int));
-  (*star)->area   = (int    *) EG_alloc(    q * sizeof(int));
-  (*star)->ratio    = (double *) EG_alloc(    q * sizeof(double));
-  (*star)->angle  = (double *) EG_alloc(    q * sizeof(double));
-  if ((*star)->verts  == NULL || (*star)->quads  == NULL ||
-      (*star)->idxV   == NULL || (*star)->idxQ   == NULL ||
+  (*star)->nQ    = q;
+  (*star)->nV    = v;
+  (*star)->type  = -1;
+  (*star)->verts = (int    *) EG_alloc(    v * sizeof(int));
+  (*star)->quads = (int    *) EG_alloc(    q * sizeof(int));
+  (*star)->idxV  = (int    *) EG_alloc(2 * v * sizeof(int));
+  (*star)->idxQ  = (int    *) EG_alloc(2 * q * sizeof(int));
+  (*star)->area  = (int    *) EG_alloc(    q * sizeof(int));
+  (*star)->ratio = (double *) EG_alloc(    q * sizeof(double));
+  (*star)->angle = (double *) EG_alloc(    q * sizeof(double));
+  if ((*star)->verts == NULL || (*star)->quads == NULL ||
+      (*star)->idxV  == NULL || (*star)->idxQ  == NULL ||
       (*star)->area  == NULL || (*star)->ratio == NULL ||
       (*star)->angle == NULL ) {
       EG_free((*star));
@@ -2027,6 +2028,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
       uvxyz = (double*)EG_alloc(5 * kv * sizeof(double));
       if ( uvxyz == NULL ) {
           EG_free(mv);
+          EG_free(qlist);
           return EGADS_MALLOC;
       }
       for (j = 0; j < kv; j++) {
@@ -2063,6 +2065,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList,
   if (area == NULL ) {
       EG_free(mv);
       EG_free(uvxyz);
+
       return EGADS_MALLOC;
   }
   for (i = 0; i < kv; i++) {
@@ -4198,6 +4201,7 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
       else if (try5533 == 1 && *transfering == 0) {
           if      (qg.vals[0] * qg.vals[3] >= 25) min = 16;
           else if (qg.vals[0] * qg.vals[3] == 16) min =  9;
+          else continue;
       } else continue;
       if (     qg.vals[1] * qg.vals[4] <= min) swap = 1;
       else if (qg.vals[2] * qg.vals[5] <= min) swap = 2;
