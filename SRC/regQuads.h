@@ -3,21 +3,22 @@
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
+
 #define ERFC(a,b,x) (0.5 * erfc(3.554147 * ((x -(0.5 * (a + b))) / (0.5 * (a - b)))))
 // NORMALIZED erfc = 0 at x = 1 and 1 at x = -1. min is better than max (eg angles) a < b
 // max is better than min (sizes) b < a
 
-#define CROSS(a,b,c)  c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
-                      c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
-                      c[2] = (a[0]*b[1]) - (a[1]*b[0])
-#define DOT(a,b)     (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
-
+#define CROSS(a,b,c)      c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
+                          c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
+                          c[2] = (a[0]*b[1]) - (a[1]*b[0])
+#define DOT(a,b)          (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
+//#define UNIT_VECTOR(v, n) v[0] /= n; v[1] /= n; v[2] /= n
 #define PI     3.1415926535897931159979635
 #define PIEPS  3.2
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
-#define ANGCUT 2.9
+#define ANGCUT 2.9  // ~ 170 DEG
 
 #define SWAP                0
 #define COLLAPSE            1
@@ -56,7 +57,7 @@ typedef struct {
            sizeV, sizeQ, *qIdx, *qAdj, **valence,
            *vInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
   ego      face;
-  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng, angcut;
+  double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
   vStar **star;
 } meshMap;
 
