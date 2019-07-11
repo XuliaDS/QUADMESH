@@ -1,5 +1,6 @@
 all:
 	make -f mkXQuads.make clean
+	make -f mkNewton.make
 	#make -f mkForceQuads.make
 	make -f mkServer.make
 	make -f mkXQuads.make
