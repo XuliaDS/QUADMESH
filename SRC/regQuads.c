@@ -9,7 +9,7 @@
 #define REPORT
 #endif
 
-#define REPORT
+//#define REPORT
 
 #ifdef REPORT
   #include <time.h>
@@ -801,7 +801,7 @@ static void EG_minArc2(const ego face, const double fact, const double *uvp, dou
       detJ   = J[0][0] * J[1][1] * J[2][2] + J[0][1] * J[1][2] * J[2][0] +
                J[0][2] * J[2][1] * J[1][0] - J[0][2] * J[1][1] * J[2][0] -
                J[1][2] * J[2][1] * J[0][0] - J[2][2] * J[1][0] * J[0][1];
-      if (fabs(detJ) < EPS10) break;
+      if (fabs(detJ) < EPS08) break;
       ATJ[0][0] =   J[1][1] * J[2][2] - J[2][1] * J[1][2];
       ATJ[0][1] = -(J[0][1] * J[2][2] - J[2][1] * J[0][2]);
       ATJ[0][2] =   J[0][1] * J[1][2] - J[1][1] * J[0][2];
@@ -848,7 +848,7 @@ static void EG_minArc2(const ego face, const double fact, const double *uvp, dou
       }
 #endif
       i = EG_evaluate(face, uvIT, pIT);
-      if (i != EGADS_SUCCESS || x2 < EPS10 ) break;
+      if (i != EGADS_SUCCESS || x2 < 1.e-10 ) break;
   }
 #ifdef DEBUG
   printf(" NEW POINT %lf %lf %lf\n", pIT[0], pIT[1], pIT[2]);

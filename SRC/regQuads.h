@@ -20,7 +20,6 @@
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
-#define EPS10  1.E-08
 #define ANGCUT 2.9  // ~ 170 DEG
 #define ISQUAD 0
 #define ISVERTEX 1
