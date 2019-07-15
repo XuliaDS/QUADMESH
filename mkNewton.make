@@ -12,7 +12,7 @@ SDIR  = SRC
 DBG   = #-g -pg
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
 	$(CC) $(DBG) -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
-	-L$(LDIR) -legads -lm
+	-L$(LDIR) -legads -lm -llapack
 
 $(ODIR)/$(FILE).o:	$(SDIR)/$(SFILE) $(IDIR)/egads.h $(IDIR)/egadsTypes.h \
 			$(IDIR)/egadsErrors.h $(SDIR)/regQuads.h

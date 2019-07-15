@@ -1,5 +1,6 @@
-﻿#include<math.h>
-#include<string.h>
+
+#include <math.h>
+#include <string.h>
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
@@ -8,20 +9,21 @@
 // NORMALIZED erfc = 0 at x = 1 and 1 at x = -1. min is better than max (eg angles) a < b
 // max is better than min (sizes) b < a
 
-#define CROSS(a,b,c)         c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
-                             c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
-                             c[2] = (a[0]*b[1]) - (a[1]*b[0])
-#define DOT    (a,b)         (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
+#define CROSS(a,b,c)      c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
+                          c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
+                          c[2] = (a[0]*b[1]) - (a[1]*b[0])
+#define DOT(a,b)          (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
 
-#define DOTFOUR(a,b)         (a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3])
-//#define UNIT_VECTOR(v, n) v[0] /= n; v[1] /= n; v[2] /= n
+#define DOT4(a,b)         (a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3])
 #define PI     3.1415926535897931159979635
 #define PIEPS  3.2
 #define qEPS   1.e-14
 
 #define EPS08  1.E-08
+#define EPS10  1.E-08
 #define ANGCUT 2.9  // ~ 170 DEG
-
+#define ISQUAD 0
+#define ISVERTEX 1
 #define SWAP                0
 #define COLLAPSE            1
 #define SPLIT               2
@@ -57,7 +59,7 @@ typedef struct{
 typedef struct {
   int      fID, oriQ, oriV, plotcount, totQ, totV, pp,
            sizeV, sizeQ, *qIdx, *qAdj, **valence,
-           *vInv, *vType, *remQ, *remV, invsteps, regBd, regBd0;
+           *vInv, *vType, *remQ, *remV, invsteps, regBd;
   ego      face;
   double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
   vStar **star;
