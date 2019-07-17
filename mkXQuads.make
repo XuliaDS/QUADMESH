@@ -13,7 +13,7 @@ $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o
 	-L$(LDIR) -legads -lm
 
 $(ODIR)/$(FILE).o:	$(SDIR)/$(SFILE) $(IDIR)/egads.h $(IDIR)/egadsTypes.h \
-			$(IDIR)/egadsErrors.h $(SDIR)/$(FILE).h
+			$(IDIR)/egadsErrors.h $(SDIR)/regQuads.h
 	$(CC) $(DBG)  -c $(COPTS) $(DEFINE) -DSTANDALONE -I$(IDIR) \
 	$(SDIR)/$(SFILE) -o $(ODIR)/$(FILE).o
 

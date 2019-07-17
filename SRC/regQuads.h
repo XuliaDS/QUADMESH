@@ -1,12 +1,11 @@
-
 #include <math.h>
 #include <string.h>
 
 #define MAX(a,b) (((a) > (b)) ? (a) : (b))
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
-#define ERFC(a,b,x) (0.5 * erfc(3.554147 * ((x -(0.5 * (a + b))) / (0.5 * (a - b)))))
-// NORMALIZED erfc = 0 at x = 1 and 1 at x = -1. min is better than max (eg angles) a < b
+#define ERF(a,b,x) (0.5 * ( 1 - erf(3.554147 * (x -(0.5 * (a + b))) / (0.5 * (a - b)))))
+// shifted erf = 0 at x = -1 and 1 at x = 1. min is better than max (eg angles) a < b
 // max is better than min (sizes) b < a
 
 #define CROSS(a,b,c)      c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
@@ -58,7 +57,7 @@ typedef struct{
 typedef struct {
   int      fID, oriQ, oriV, plotcount, totQ, totV, pp,
            sizeV, sizeQ, *qIdx, *qAdj, **valence,
-           *vInv, *vType, *remQ, *remV, invsteps, regBd;
+           *vInv, *vType, *remQ, *remV, invsteps, regBd, *degen;
   ego      face;
   double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
   vStar **star;
