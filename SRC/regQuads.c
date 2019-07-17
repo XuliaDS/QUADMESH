@@ -804,10 +804,13 @@ static void EG_baricentricSplit(ego face, double w1, double w2, double w3,
 	  /* get areas */
 	  CROSS(OB, OC, crossA);
 	  a = sqrt(DOT(crossA, crossA));
+	  
 	  CROSS(OC, OA, crossB);
 	  b = sqrt(DOT(crossB, crossB));
+	  
 	  CROSS(OA, OB, crossC);
 	  c = sqrt(DOT(crossC, crossC));
+	  
 	  d = a + b + c;
 	  
 	  printf(" crossA %lf %lf %lf \n", crossA[0], crossA[1], crossA[2]);
@@ -823,8 +826,6 @@ static void EG_baricentricSplit(ego face, double w1, double w2, double w3,
 	  /* Compute Jacobian */
 	  // d_u (a x b ) = d_u a x b + a x d_u b (x = cross product)
 	  // DU 
-	  
-	
 	  printf(" CB %lf %lf %lf\n", CB[0], CB[1], CB[2]);
 	  printf(" AC %lf %lf %lf\n", AC[0], AC[1], AC[2]);
 	  printf(" BA %lf %lf %lf\n", BA[0], BA[1], BA[2]);
@@ -893,9 +894,9 @@ static void EG_baricentricSplit(ego face, double w1, double w2, double w3,
       printf(" ----------------------\n");
 #endif
 
-      detJ     = 1.0 / detJ;
-      delta[0] = -detJ * (ATJ[0][0] * L[0] + ATJ[0][1] * L[1]);
-      delta[1] = -detJ * (ATJ[1][0] * L[0] + ATJ[1][1] * L[1]);
+      detJ      = 1.0 / detJ;
+      delta[0]  = -detJ * (ATJ[0][0] * L[0] + ATJ[0][1] * L[1]);
+      delta[1]  = -detJ * (ATJ[1][0] * L[0] + ATJ[1][1] * L[1]);
       uvIT[0]  += delta[0];
       uvIT[1]  += delta[1];
       x2       = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
