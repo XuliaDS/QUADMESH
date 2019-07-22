@@ -4,9 +4,9 @@ include $(IDIR)/$(ESP_ARCH)
 LDIR  = $(ESP_ROOT)/lib
 ODIR  = obj
 TDIR  = BUILDS
-FILE  = espQuads
+FILE  = espquads
 SFILE = $(FILE).c
-SDIR  = espsrc
+SDIR  = SRC
 $(TDIR)/$(FILE):	$(ODIR)/$(FILE).o 
 	$(CC) -g -pg -o $(TDIR)/$(FILE) $(ODIR)/$(FILE).o \
 		-L$(LDIR) -legads -lm

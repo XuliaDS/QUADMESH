@@ -37,7 +37,7 @@
 #define QA2  200
 #define QA3  40000
 #define QACB 8000000  // crosses domain bounds: SUPER INVALID
-
+             
 typedef struct{
   int verts[4], qadj[4], id;
 } Quad;

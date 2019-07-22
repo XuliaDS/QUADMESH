@@ -1,0 +1,177 @@
+static void 
+EG_baricentricSplit(ego face, double w1, double w2, double w3,
+   	            double *uvA, double *uvB, double *uvC, double *uvOUT)
+
+  int    i, it, nT = 100, stat;
+  double tol, pA[18], pB[18], pC[18], OA[3], OB[3], OC[3], pIT[18], J[2][2], ATJ[2][2],
+         crossA[3], crossB[3], crossC[3], grad[3], a, b, c, d, delta[2], L[2], detJ, x0,
+         x1, x2, e1 = 0.0, e2 = 0.0, uvIT[2], vecA[3], vecB[3], vecC[3], 
+         CB[3], AC[3], BA[3], da, db,dc;
+
+  //Initial guess uv = 0.3 (uvA + uvB + uvC)
+  uvIT[0]   = w1 * uvA[0] + w2 * uvB[0] + w3 * uvC[0];
+  uvIT[1]   = w1 * uvA[1] + w2 * uvB[1] + w3 * uvC[1];
+  stat      = EG_evaluate(face, uvA , pA);
+  stat     += EG_evaluate(face, uvB , pB);
+  stat     += EG_evaluate(face, uvC , pC);
+  stat     += EG_evaluate(face, uvIT, pIT);
+  if (stat != EGADS_SUCCESS) {
+    printf(" EG_baricentricSplit EG_evaluate triangle vertices stat %d !!\n", stat);
+    return;
+  }
+#ifdef DEBUG
+  OA[0] = pA[0] - pIT[0];
+  OA[1] = pA[1] - pIT[1];
+  OA[2] = pA[2] - pIT[2];
+
+  OB[0] = pB[0] - pIT[0];
+  OB[1] = pB[1] - pIT[1];
+  OB[2] = pB[2] - pIT[2];
+
+  OC[0] = pC[0] - pIT[0];
+  OC[1] = pC[1] - pIT[1];
+  OC[2] = pC[2] - pIT[2];
+  /* get areas */
+  CROSS(OB, OC, crossA);
+  a = sqrt(DOT(crossA, crossA));
+  CROSS(OC, OA, crossB);
+  b = sqrt(DOT(crossB, crossB));
+  CROSS(OA, OB, crossC);
+  c = sqrt(DOT(crossC, crossC));
+  d = a + b + c;
+  printf(" Initial areas a %lf  b  %lf  c %lf \n ratios %lf %lf %lf (expected %lf %lf %lf\n",
+           a, b, c, a / d, b/d, c/d, w1, w2, w3);
+#endif
+  tol   = 1.e-14;
+  CB[0] = pB[0] - pC[0]; CB[1] = pB[1] - pC[1]; CB[2] = pB[2] - pC[2];
+  AC[0] = pC[0] - pA[0]; AC[1] = pC[1] - pA[1]; AC[2] = pC[2] - pA[2];
+  BA[0] = pA[0] - pB[0]; BA[1] = pA[1] - pB[1]; BA[2] = pA[2] - pB[2];
+  for (it = 0; it < nT; it++) {
+     /* Get vectors */
+     OA[0] = pA[0] - pIT[0]; OA[1] = pA[1] - pIT[1]; OA[2] = pA[2] - pIT[2];
+     OB[0] = pB[0] - pIT[0]; OB[1] = pB[1] - pIT[1]; OB[2] = pB[2] - pIT[2];
+     OC[0] = pC[0] - pIT[0]; OC[1] = pC[1] - pIT[1]; OC[2] = pC[2] - pIT[2];
+     /* get areas */
+    CROSS(OB, OC, crossA);
+    a = sqrt(DOT(crossA, crossA));
+    CROSS(OC, OA, crossB);
+    b = sqrt(DOT(crossB, crossB));
+    CROSS(OA, OB, crossC);
+    c = sqrt(DOT(crossC, crossC));
+    /* Evaluate fn */
+    /* a = w1 (a + b + c) 
+     * b = w2 (a + b + c)
+     * c = w3 (a + b + c)
+     * a + b + c = b / w2
+     * a = w1/w2 * b; c = w3 / w2 *  b */
+    L[0] = w2 * a - w1 * b;
+    L[1] = w2 * c - w3 * b;
+#ifdef DEBUG
+    printf(" L %lf %lf\n", L[0], L[1]);
+#endif
+   /* Compute Jacobian
+    * du (OA x OB) = du ((A-O) x (B-O)) =
+    * du (A x (B-O) - O x (B-O) =
+    * du (A x B - A x O - O x B -O x O) =
+    * du (A x B + O x A - O x B) =
+    * du (A x B + O x (A - B)) = duO x (A-B) */
+    // DU
+    grad[0] = pIT[3]; grad[1] = pIT[4]; grad[2] = pIT[5];
+    CROSS(grad, CB, vecA);
+    CROSS(grad, AC, vecB);
+    CROSS(grad, BA, vecC);
+    da      = (crossA[0] * vecA[0] + crossA[1] * vecA[1] +
+               crossA[2] * vecA[2]) / a;
+    db      = (crossB[0] * vecB[0] + crossB[1] * vecB[1] +
+               crossB[2] * vecB[2]) / b;
+    dc      = (crossC[0] * vecC[0] + crossC[1] * vecC[1] +
+               crossC[2] * vecC[2]) / c;
+    J[0][0] = da * w2 - db * w1;
+    J[1][0] = dc * w2 - db * w3;
+    // DV
+    grad[0] = pIT[6]; grad[1] = pIT[7]; grad[2] = pIT[8];
+    CROSS(grad, CB, vecA);
+    CROSS(grad, AC, vecB);
+    CROSS(grad, BA, vecC);
+    da  = (crossA[0] * vecA[0] + crossA[1] * vecA[1] +
+           crossA[2] * vecA[2]) / a;
+    db  = (crossB[0] * vecB[0] + crossB[1] * vecB[1] +
+           crossB[2] * vecB[2]) / b;
+    dc  = (crossC[0] * vecC[0] + crossC[1] * vecC[1] +
+           crossC[2] * vecC[2]) / c;
+    J[0][1] = da * w2 - db * w1;
+    J[1][1] = dc * w2 - db * w3;
+    // Solve Linear System: J * delta = - f_n
+    detJ    = J[0][0] * J[1][1] - J[0][1] * J[1][0];
+#ifdef DEBUG
+    printf(" JACOBIAN MATRIX 2 x 2 DET %1.2e\n", detJ);
+    printf(" %lf %lf \n",J[0][0], J[0][1]);
+    printf(" %lf %lf \n",J[1][0], J[1][1]);
+    printf(" ----------------------\n");
+#endif
+    if (fabs(detJ) < 1.e-08) {
+       printf(" DETERMINANT SIZE %lf  \n", detJ);
+       break;
+    }
+    ATJ[0][0] =   J[1][1]; ATJ[0][1] = - J[0][1];
+    ATJ[1][0] = - J[1][0]; ATJ[1][1] =   J[0][0];
+#ifdef DEBUG
+    printf(" INVERSE MATRIX 2 x 2  WITHOUT 1/DET\n");
+    printf(" %lf %lf \n",ATJ[0][0], ATJ[0][1]);
+    printf(" %lf %lf \n",ATJ[1][0], ATJ[1][1]);
+    printf(" ----------------------\n");
+#endif
+    detJ      = 1.0 / detJ;
+    delta[0]  = -detJ * (ATJ[0][0] * L[0] + ATJ[0][1] * L[1]);
+    delta[1]  = -detJ * (ATJ[1][0] * L[0] + ATJ[1][1] * L[1]);
+    uvIT[0]  += delta[0];
+    uvIT[1]  += delta[1];
+    x2        = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+    if      (it == 0) x0 = x2;
+    else if (it == 1) x1 = x2;
+    else {
+        e1 = fabs(x1 / x0);
+        e2 = fabs(x2 / x1);
+        x0 = x1;
+        x1 = x2;
+      }
+#ifdef DEBUG
+    printf(" Xn = (%lf %lf) L = %lf %lf DELTA %lf %lf SIZE  %1.2e < %1.2e\n",
+    uvIT[0], uvIT[1], L[0], L[1], delta[0], delta[1], x2, tol );
+#endif
+    i = EG_evaluate(face, uvIT, pIT);
+    if (i != EGADS_SUCCESS || x2 < tol ) {
+        printf("EG_evaluate %d  DELTA SIZE %1.2e < %1.2e \n",
+        i, x2, tol);
+        break;
+    }
+  }
+  #ifdef DEBUG
+  printf(" \n\n Found point %lf %lf %lf %lf %lf\n",
+           pIT[0], pIT[1], pIT[2], uvIT[0], uvIT[1]);
+  if (e1 > 0.0 && e2 > 0.0)
+       printf(" Newton iterations %d Rate %lf \n", it, log(e2) / log(e1));
+  OA[0] = pA[0] - pIT[0];
+  OA[1] = pA[1] - pIT[1];
+  OA[2] = pA[2] - pIT[2];
+  OB[0] = pB[0] - pIT[0];
+  OB[1] = pB[1] - pIT[1];
+  OC[0] = pC[0] - pIT[0];
+  OC[1] = pC[1] - pIT[1];
+  OC[2] = pC[2] - pIT[2];
+
+  /* get areas */
+  CROSS(OB, OC, crossA);
+  a = 0.5 * sqrt(DOT(crossA, crossA));
+  CROSS(OC, OA, crossB);
+  b = 0.5 * sqrt(DOT(crossB, crossB));
+  CROSS(OA, OB, crossC);
+  c = 0.5 * sqrt(DOT(crossC, crossC));
+  d = a + b + c;
+  printf(" Final areas a %lf  b  %lf  c %lf \n ratios %lf %lf %lf (expected %lf %lf %lf\n",
+           a, b, c, a / d, b/d, c/d, w1, w2, w3);
+#endif
+  return;
+}
+
+
