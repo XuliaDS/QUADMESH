@@ -1766,7 +1766,7 @@ static int EG_vertexArea(meshMap *qm, int vID)
 static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   int q, v, j, i, k, *vl = NULL, ta[2], v1, v2, v3, corner,
       la = -1, lb, nt, block = 0, round, doublet = 0, bt = -1, i0;
-  double uv[6], res[6], angopt =0.0, angpen, errbd, ptol = 0.25, auxd, suv[8];
+  double uv[4], res[6], angopt =0.0, angpen, errbd, ptol = 0.25, auxd;
   int *qInfo = NULL;
 #ifdef DEBUG2
   char buffer[100];
@@ -1873,8 +1873,6 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   }
   uv [0] = qm->uvs[2 * v    ];
   uv [1] = qm->uvs[2 * v + 1];
-  uv [4] = uv[0];
-  uv [5] = uv[1];
   angopt = 0.0;
   k      = 0;
   if      (la     != -1) k = la;
@@ -1887,27 +1885,28 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
       qm->star[v]->verts[k], angopt, qm->valence[qm->star[v]->verts[k]-1][2]);
 #endif
   }
-  block  = 0;
-  nt     = qm->star[v]->nV;
+  block   = 0;
+  nt      = qm->star[v]->nV;
   if (bt == 3 && full == 0) full = 1;
-  ta[0]  = ta[1] = QA0;
+  ta[0]   = ta[1] = QA0;
   for (i0 = round = 0; round < 2; round++) {
       for (q = 0; q <= nt; q++) {
           if (i0 == 1) {
-              if (q > 0 && (block > 0 || pass == -1 || qm-> star[v]->nQ == 3)) break;
-              uv[2] = uv[0];
-              uv[3] = uv[1];
-              updateVertex(qm, vID, uv);
+              if (q > 0 && (block > 0 || pass == -1 ||
+                             qm-> star[v]->nQ == 3 )) break;
 #ifdef DEBUG2
               printf ("\n\n PLACEVERT ROUND %d la %d q %d / %d PASS %d block %d\n ",
               round, la, q, nt, pass, block);
 #endif
+              updateVertex(qm, vID, uv);
               if (q == 0) {
-                  EG_centroid (qm, qm->star[v]->nQ, &qm->valence[v][3], &uv[2], (round+1)%2);
-                  if (la != -1 && ta[0] == QA0 && full != 2) {
-                      if (qm->star[v]-> nQ != 4) continue;
-                      uv[2] = 0.75 * uv[0] + 0.25 * uv[2];
-                      uv[3] = 0.75 * uv[1] + 0.25 * uv[3];
+                uv[2] = uv[0];
+                uv[3] = uv[1];
+                EG_centroid (qm, qm->star[v]->nQ, &qm->valence[v][3], &uv[2], 1);//(round+1)%2);
+                if (la != -1 && ta[0] == QA0 && full != 2) {
+                    if (qm->star[v]-> nQ != 4) continue;
+                    uv[2] = 0.75 * uv[0] + 0.25 * uv[2];
+                    uv[3] = 0.75 * uv[1] + 0.25 * uv[3];
                   }
               } else if (round == 0) {
                   if ((    qm->star[v]->nQ %2 == 0 && q > qm->star[v]->nQ / 2) ||
@@ -1926,21 +1925,29 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                           (vl[1] == qm->star[v]->verts[v1] - 1  ||
                            vl[1] == qm->star[v]->verts[v2] - 1)) continue;
                   }
-                  suv[0] = qm->uvs[2 * vl[0]]; suv[1] = qm->uvs[2 * vl[0] + 1];
-                  suv[2] = qm->uvs[2 * vl[1]]; suv[3] = qm->uvs[2 * vl[1] + 1];
-                  EG_getSidepoint(qm->face, 0.5, suv, &suv[2], uv);
+                  if (qm->vType[vl[0]] > 0 && qm->degen[vl[0]] == 1 ||
+                      qm->vType[vl[1]] > 0 && qm->degen[vl[1]] == 1 ) {
+                        vl[0]++; vl[1]++;
+                        EG_centroid(qm, 2, vl, &uv[2], 0);
+                   } else
+                      EG_getSidepoint(qm->face, 0.5, &qm->uvs[2 * vl[0]],
+                                     &qm->uvs[2 * vl[1]], &uv[2]);
               } else if (la != -1) {
                   lb = qm->star[v]->idxV [la + q];
                   if( (abs(lb - la) < 3 || abs(lb - la) > (nt - 1) - 3 ) ||
                       (ta[0] == QA0 && q % 2 == 1))  continue;
-                  vl [0] = qm->star[v]->verts[la] - 1;
-                  vl [1] = qm->star[v]->verts[lb] - 1;
-                  suv[0] = qm->uvs[2 * vl[0]]; suv[1] = qm->uvs[2 * vl[0] + 1];
-                  suv[2] = qm->uvs[2 * vl[1]]; suv[3] = qm->uvs[2 * vl[1] + 1];
-                  EG_getSidepoint(qm->face, 0.5, suv, &suv[2], uv);
+                  vl[0] = qm->star[v]->verts[la] - 1;
+                  vl[1] = qm->star[v]->verts[lb] - 1;
+                  if (qm->vType[vl[0]] > 0 && qm->degen[vl[0]] == 1 ||
+                      qm->vType[vl[1]] > 0 && qm->degen[vl[1]] == 1 ) {
+                        vl[0]++; vl[1]++;
+                        EG_centroid(qm, 2, vl, &uv[2], 0);
+                   }
+                   else EG_getSidepoint(qm->face, 0.5, &qm->uvs[2 * vl[0]],
+                                       &qm->uvs[2 * vl[1]], &uv[2]);
               } else {
                   if (q - 1 >= qm->star[v]->nQ || ta[0] == QA0 ) break;
-                  vl[0]  = v + 1;
+                  vl[0]  = vID;
                   i      = 1;
                   for (k = 0; k < qm->star[v]->nQ; k++) {
                       j  = qm->star[v]->verts[2 * k + 1] -1;
@@ -1956,7 +1963,7 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
               }
               updateVertex(qm, vID, &uv[2]);
           }
-          ta[i0]          = EG_vertexArea(qm, vID);
+          ta[i0]          = EG_vertexArea(qm, vID, full);
           angpen          = 0.0;
           res[3 * i0    ] = 1.0;
           res[3 * i0 + 1] = 1.0;
@@ -2061,8 +2068,10 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
           // compare areas and see if we should update
           k = 0;
           if (pass == -1) {
-              if (la == -1 && (ta[1] < QA2 || (qm->pp == 1 && ta[1] <= QA2))) k = 2;
-              else continue;
+              if (la == -1 && (ta[1] < QA2 || (qm->pp == 1 && ta[1] <= QA2))) {
+	            k = 2;
+                block = 1;
+	          }
           }
           else if (ta[0] <  ta[1]) continue;
           else if (ta[1] <  ta[0])  k = 1;
@@ -2090,25 +2099,28 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                   }
               }
           }
-          if (k == 0) continue;
+          if (k == 0) {
+            updateVertex(qm, vID, uv);
+            continue;
+          }
 #ifdef DEBUG2
           update = 1;
           printf(" k = %d pass %d q %d r %d\n", k, pass, q , round);
           printf(" NEW  AREA %d RATIOS NEG %lf PIV %lf SEC %lf\n", ta[1], res[3], res[4], res[5]);
           printf(" BEST AREA %d RATIOS NEG %lf PIV %lf SEC %lf\n", ta[0], res[0], res[1], res[2]);
 #endif
-          uv [4] = uv[2];
-          uv [5] = uv[3];
+          uv [0] = uv [2];
+          uv [1] = uv [3];
           res[0] = res[3];
           res[1] = res[4];
           res[2] = res[5];
-          ta [0] = ta[1];
+          ta [0] = ta [1];
           if (ta[0] != QA0) continue;
-          if (doublet == 1 || k == 2 || q == 0) block = 1;
+          if (doublet == 1 || k == 2 || q == 0 || full == 10) block = 1;
       }
       if (block > 0) break;
   }
-  updateVertex(qm, vID, &uv[4]);
+  updateVertex(qm, vID, uv);
 #ifdef DEBUG2
   printf(" UPDATING AREAS ???? %d \n", update);
   snprintf(buffer, 100,"PLACE_%d_%d", qm->plotcount, vID);
@@ -2138,6 +2150,7 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   EG_free(qInfo);
   return ta[0];
 }
+
 
 
 int EG_createMeshMap(bodyQuad *bodydata)

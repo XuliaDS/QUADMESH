@@ -1,0 +1,35 @@
+# spheres
+# written by John Dannenhoffer
+
+sphere          0.00      0.00       0.00      1.00
+
+#cut box
+     skbeg   -0.7 -1  -0.5 
+     linseg   0.2 -1  -0.5
+     linseg   0.2 -1   0.5
+     linseg  -0.7 -1   0.5
+     linseg  -0.7 -1  -0.5
+skend
+extrude         0 0.95 0 
+subtract 
+
+#cut box
+     skbeg    0.5 -1 -0.4 
+     linseg   0.8 -1 -0.4
+     linseg   0.8 -1  0.4
+     linseg   0.5 -1  0.4
+     linseg   0.5 -1 -0.4
+skend
+extrude         0 0.95 0 
+subtract 
+
+
+sphere           0.00      1.25      0.00      0.700
+
+subtract
+
+dump spherecut.egads
+
+
+
+end

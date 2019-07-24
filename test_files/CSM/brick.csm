@@ -1,0 +1,17 @@
+
+# cut box
+     skbeg   0  0 0 
+     linseg  1  0 0
+     linseg  2  1 0 
+     linseg  1  1 0
+     linseg  0  0 0
+skend
+
+extrude         0  0 2 
+
+
+# write the file
+dump regularBrick.egads
+
+end
+

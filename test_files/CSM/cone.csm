@@ -1,0 +1,13 @@
+# cone.csm written by ocsmSave (v1.13)
+
+# Constant and Design Parameters:
+
+# Global Attributes:
+
+# Branches:
+cone      0   0   0   0   1   0   1
+sphere    0   0   0   0.25
+subtract
+sphere    0.95   0.55   0   0.4
+subtract
+end
