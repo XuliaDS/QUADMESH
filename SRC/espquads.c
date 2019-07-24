@@ -4469,7 +4469,8 @@ static void meshProperties (meshMap *qm, int sweep )
           else                                                quarts[3]++;
           if     (qm->star[k]->ratio[j] < 0.1 ) quarts[4]++;
           else if(qm->star[k]->ratio[j] < 0.25) quarts[5]++;
-          else if(qm->star[k]->ratio[j] < 0.6 ) quarts[6]++;
+          else if(qm->star[k]->ratio[j] < 0.5 ) quarts[6]++;
+		  else if(qm->star[k]->ratio[j] < 0.75) quarts[6]++;
           else                                    quarts[7]++;
       }
   }
@@ -4824,7 +4825,7 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
               return stat;
           }
           totActivity += activity;
-                if ( it == 0 ) {
+                if ( it == -1 ) {
       stat       = resizeQm(qm );
       printf(" TRANSFER VALENCES  IV %d vQ %d totV %d \n ", iV ,vQ, totV);
       snprintf(buffer,100, "r1_%d_%d.txt", qm->fID, q);
