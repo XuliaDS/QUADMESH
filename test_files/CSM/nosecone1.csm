@@ -1,4 +1,4 @@
-# nosecone2
+# nosecone1
 # written by Justin Gray
 
 despmtr h 0.9
@@ -24,6 +24,6 @@ skbeg 0 h 0
     linseg 0 h 0 
 skend
 
-revolve 0 0 0 1 0 0 360
-dump nosecone2.egads
+revolve 0 0 0 0 1 0 360
+dump nosecone1.egads
 end

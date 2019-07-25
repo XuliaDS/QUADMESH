@@ -3,7 +3,7 @@
 
 //#define DEBUG
 //#define DEBUG2
-#define REPORT
+//#define REPORT
 
 #ifdef DEBUG
  #define REPORT
@@ -761,11 +761,15 @@ static void EG_centroid(meshMap *qm, int n, int *list, double *uvOUT, int usequv
       uv[1]  += qm->uvs [2 * (list[i] - 1) + 1];
       sumuv++;
   }
-  xyz0[0] /= (double) sumxyz;
-  xyz0[1] /= (double) sumxyz;
-  xyz0[2] /= (double) sumxyz;
-  uv [0]  /= (double) sumuv;
-  uv [1]  /= (double) sumuv;
+  if (sumxyz > 1 ) {
+    xyz0[0] /= (double) sumxyz;
+    xyz0[1] /= (double) sumxyz;
+    xyz0[2] /= (double) sumxyz;
+  }
+  if (sumuv > 1 ) {
+    uv [0]  /= (double) sumuv;
+    uv [1]  /= (double) sumuv;
+  }
   uvOUT[0] = uv[0];
   uvOUT[1] = uv[1];
   i        = EG_invEvaluateGuess(qm->face, xyz0, uv, xyz1);
@@ -834,12 +838,11 @@ static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
   dot1      = sqrt(dot1 * dot2);
   // check that it is not singular point. Boundary vertices use also normal plane at a point inside.
   if (dot1 < qEPS || qm->vType[vC-1] != -1) {
-      if (qm->vType[vC -1] != -1 )
-          EG_centroid(qm, 4, &qm->qIdx[4 * (qm->valence[vC -1][0] - 1)], quv, 0);
-      else {
+      if (qm->vType[vC -1] != -1 ) 
+		  EG_centroid(qm, 4, &qm->qIdx[4 * (qm->valence[vC -1][0] - 1)], quv, 0);
+	  else {
           quv[0] = qm->uvs[ 2 * (vC - 1)    ];
           quv[1] = qm->uvs[ 2 * (vC - 1) + 1];
-          printf(" CALL CENTROID FOR %d \n", vC);
           EG_centroid(qm, qm->valence[vC -1][2], &qm->valence[vC -1][3], quv, 1);
       }
       if (stat != EGADS_SUCCESS) return stat;
@@ -849,9 +852,14 @@ static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
       dot2 = centre[6] * centre[6] + centre[7] * centre[7] + centre[8] * centre[8];
       dot1 = sqrt(dot1 * dot2);
       if (dot1 < qEPS) {
-          printf("EG_angleAtVnormalPlane du %lf %lf %lf dv %lf %lf %lf\n",
+#ifdef DEBUG  // NOSE CASE HAS DEGENERATE QUAD EVEN AFTER EG_CENTROID. IT IS ENTERING HERE SOMETIMES
+              // NEED TO FIX IT AT SOME POINT !!!!
+		  printf("EG_angleAtVnormalPlane VERT %d TYPE %d LINK TO %d %d "
+				  " du %lf %lf %lf dv %lf %lf %lf\n",
+				  vC, qm->vType[vC -1], v1, v2,
                  centre[3], centre[4], centre[5],
                  centre[6], centre[7], centre[8]);
+#endif
           return EGADS_GEOMERR;
       }
   }
@@ -905,7 +913,8 @@ static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
 static int EG_angAtBdVert(meshMap *qm, int v, int *links, double *size)
 {
   int i, j, k;
-
+  double dist = 0.0;
+  
   *size = 0.0;
   if (qm->vType[v - 1]  <    0) return EGADS_INDEXERR;
   if (qm->star [v - 1] == NULL) {
@@ -923,12 +932,25 @@ static int EG_angAtBdVert(meshMap *qm, int v, int *links, double *size)
   if (k >= 3) {
       *size = PI * 0.5; // boundary vertex is connected to more than two bounds (?)
       return EGADS_SUCCESS;
-  }
-  else if (k != 2) {
+  } else if (k != 2) {
       printf(" EG_angAtBdVert:: vertex %d is at surface bounds and connected only to another boundary vertex !!\n ", v);
       return EGADS_GEOMERR;
+  } else {
+	  dist =  (qm->xyzs[3 * (links[1] - 1)]     - qm->xyzs[3 * (links[0] - 1)]    ) *  
+	          (qm->xyzs[3 * (links[1] - 1)]     - qm->xyzs[3 * (links[0] - 1)]    ) ; 
+	  dist += (qm->xyzs[3 * (links[1] - 1) + 1] - qm->xyzs[3 * (links[0] - 1) + 1]) *  
+	          (qm->xyzs[3 * (links[1] - 1) + 1] - qm->xyzs[3 * (links[0] - 1) + 1]) ; 
+      dist += (qm->xyzs[3 * (links[1] - 1) + 2] - qm->xyzs[3 * (links[0] - 1) + 2]) *  
+	          (qm->xyzs[3 * (links[1] - 1) + 2] - qm->xyzs[3 * (links[0] - 1) + 2]) ; 			 
+	  if (dist < 1.e-10) {
+		  *size = 2.0 * PI;
+#ifdef DEBUG
+		  printf(" FACE %d V %d IS PERIODIC. ASSIGN ANGLE 2pi\n", qm->fID, v);
+#endif
+		  return EGADS_SUCCESS;
+	  }
+	  return EG_angleAtVnormalPlane(qm, v, links[0], links[1], &(*size));
   }
-  else return EG_angleAtVnormalPlane(qm, v, links[0], links[1], &(*size));
 }
 
 
@@ -1069,6 +1091,9 @@ static int EG_vertexArea(meshMap *qm, int vID)
                   norm2 = nXYZ[6] * nXYZ[6] + nXYZ[7] * nXYZ[7] + nXYZ[8] * nXYZ[8];
                   norm1 = sqrt(norm1 * norm2);
                   if (norm1 < qEPS || stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+                  printf("CENTROID NOT BETTERvertex %d NORM1 %lf < %lf\n",qV[k]+ 1,norm1, qEPS);
+#endif
                       ori[k] = 1;
                       ang[k] = PI * 0.5;
                       continue;
@@ -1104,11 +1129,11 @@ static int EG_vertexArea(meshMap *qm, int vID)
                   if (DOT(vNormal, cross) < qEPS) ori[k] = -1;
               }
               if (epsuv > 0 && ori[k] == 1) {
-                if (((qm->vType[qV[vD]] > 0 && qm->degen[qV[vD]] == 0 ) ||
+				  if (((qm->vType[qV[vD]]   > 0  && qm->degen[qV[vD]] == 0 ) ||
                       qm->vType[qV[vD]] == -1) &&
                       qm->vType[qV[vD]] * qm->vType[qV[vA]] < 0) {
                   //printf(" CALL GET SIDE POINT V0 %d T %d V1 %d T %d \n", qV[vA], qm->vType[qV[vA]], qV[vD], qm->vType[qV[vD]] );
-                 //  printf(" A %lf %lf B %lf %lf\n",qm->uvs[2 * qV[vA]], qm->uvs[2 * qV[vA] + 1], qm->uvs[2 * qV[vD]], qm->uvs[2 * qV[vD] + 1]  );
+                  //printf(" A %lf %lf B %lf %lf\n",qm->uvs[2 * qV[vA]], qm->uvs[2 * qV[vA] + 1], qm->uvs[2 * qV[vD]], qm->uvs[2 * qV[vD] + 1]  );
                   EG_getSidepoint(qm->face,fact, &qm->uvs[2 * qV[vA]],
                                  &qm->uvs[2 * qV[vD]], uv);
                   if (EG_evaluate(qm->face, uv, xyz) == EGADS_SUCCESS) {
@@ -1122,11 +1147,11 @@ static int EG_vertexArea(meshMap *qm, int vID)
                   vAD[1] = pQ[3 * vD + 1] - qm->xyzs[3 *qV[vA] + 1];
                   vAD[2] = pQ[3 * vD + 2] - qm->xyzs[3 *qV[vA] + 2];
                 }
-                if (((qm->vType[qV[vB]] > 0 && qm->degen[qV[vB]] == 0 ) ||
+                if (((qm->vType[qV[vB]]   > 0  && qm->degen[qV[vB]] == 0 ) ||
                       qm->vType[qV[vB]] == -1) &&
                       qm->vType[qV[vB]] * qm->vType[qV[vA]] < 0) {
-            //    printf(" CALL GET SIDE POINT V0 %d T %d V1 %d T %d \n", qV[vA], qm->vType[qV[vA]], qV[vB], qm->vType[qV[vB]] );
-             //   printf(" A %lf %lf B %lf %lf\n",qm->uvs[2 * qV[vA]], qm->uvs[2 * qV[vA] + 1], qm->uvs[2 * qV[vB]], qm->uvs[2 * qV[vB] + 1]  );
+                //printf(" CALL GET SIDE POINT V0 %d T %d V1 %d T %d \n", qV[vA], qm->vType[qV[vA]], qV[vB], qm->vType[qV[vB]] );
+                //printf(" A %lf %lf B %lf %lf\n",qm->uvs[2 * qV[vA]], qm->uvs[2 * qV[vA] + 1], qm->uvs[2 * qV[vB]], qm->uvs[2 * qV[vB] + 1]  );
                   EG_getSidepoint(qm->face, fact, &qm->uvs[2 * qV[vA]],
                                  &qm->uvs[2 * qV[vB]], uv);
                   if (EG_evaluate(qm->face, uv, xyz) == EGADS_SUCCESS) {
@@ -1139,26 +1164,27 @@ static int EG_vertexArea(meshMap *qm, int vID)
                   vAB[0] = pQ[3 * vB    ] - qm->xyzs[3 *qV[vA]    ];
                   vAB[1] = pQ[3 * vB + 1] - qm->xyzs[3 *qV[vA] + 1];
                   vAB[2] = pQ[3 * vB + 2] - qm->xyzs[3 *qV[vA] + 2];
-              }
-#ifdef DEBUG
-                  printf(" %lf %lf %lf %d %lf %lf\n\n\n",pQ[3 * i    ], pQ[3 * i + 1],pQ[3 * i + 2], qV[i]+1, uv[0], uv[1] );
-                  printf(" %lf %lf %lf %d %lf %lf\n",qm->xyzs[3 * qV[i]    ], qm->xyzs[3 * qV[i] + 1],
-                  qm->xyzs[3 * qV[i] + 2], qV[i]+1,qm->uvs[2 * qV[i]    ], qm->uvs[2 * qV[i] + 1]  );
-#endif
-              }
-
-              CROSS(vAB, vAD, cross);
-              norm1 = sqrt(DOT(vAB, vAB) * DOT(vAD, vAD));
-              if (norm1 < qEPS ) dot = 1.0;
-              else dot = DOT(vAB, vAD) / norm1;
-              if      (fabs(dot - 1.0) < EPS08) ang[k] = 0.0;
-              else if (fabs(dot + 1.0) < EPS08) ang[k] = PI;
-              else                              ang[k] = acos(dot);
-              if (DOT(vNormal, cross) < 0.0) ang[k] = (2.0 * PI - ang[k]);
-              ma = MAX(ma, ang[k]);
-              if ((qm->vType[qV[k]] > 0 && qm->bdAng[qV[k]] > PIEPS) ||
-                  (qm->vType[qm->valence[qV[k]][3] - 1] > 0 &&
-                   qm->bdAng[qm->valence[qV[k]][3] - 1] > PIEPS)) mba = MAX(mba, ang[k]);
+				  }
+               }
+             CROSS(vAB, vAD, cross);
+             norm1 = sqrt(DOT(vAB, vAB) * DOT(vAD, vAD));
+			 if (norm1 < qEPS) dot = 1.0;
+             else dot = DOT(vAB, vAD) / norm1;
+             if      (fabs(dot - 1.0) < EPS08) ang[k] = 0.0;
+             else if (fabs(dot + 1.0) < EPS08) ang[k] = PI;
+             else                              ang[k] = acos(dot);
+			 norm1 = sqrt(DOT(cross, cross));//vAB, vAB) * DOT(vAD, vAD));
+             if (norm1 > 1.e-10) {
+				 cross[0] /= norm1;
+				 cross[1] /= norm1;
+				 cross[2] /= norm1;
+			 }
+			 if (DOT(vNormal, cross) < 0.0 || 
+			      ori[k] == -1) ang[k] = (2.0 * PI - ang[k]);
+             ma = MAX(ma, ang[k]);
+             if ((qm->vType[qV[k]] > 0 && qm->bdAng[qV[k]] > PIEPS) ||
+                 (qm->vType[qm->valence[qV[k]][3] - 1] > 0 &&
+                  qm->bdAng[qm->valence[qV[k]][3] - 1] > PIEPS)) mba = MAX(mba, ang[k]);
           }
           if (ori[k] == -1) continue;
           selfint = 0;
@@ -1535,8 +1561,8 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                           (vl[1] == qm->star[v]->verts[v1] - 1  ||
                            vl[1] == qm->star[v]->verts[v2] - 1)) continue;
                   }
-                  if (qm->vType[vl[0]] > 0 && qm->degen[vl[0]] == 1 ||
-                      qm->vType[vl[1]] > 0 && qm->degen[vl[1]] == 1 ) {
+                  if ((qm->vType[vl[0]] > 0 && qm->degen[vl[0]] == 1) ||
+                      (qm->vType[vl[1]] > 0 && qm->degen[vl[1]] == 1)) {
                         vl[0]++; vl[1]++;
                         EG_centroid(qm, 2, vl, &uv[2], 0);
                    } else
@@ -1548,8 +1574,8 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                       (ta[0] == QA0 && q % 2 == 1))  continue;
                   vl[0] = qm->star[v]->verts[la] - 1;
                   vl[1] = qm->star[v]->verts[lb] - 1;
-                  if (qm->vType[vl[0]] > 0 && qm->degen[vl[0]] == 1 ||
-                      qm->vType[vl[1]] > 0 && qm->degen[vl[1]] == 1 ) {
+                  if ((qm->vType[vl[0]] > 0 && qm->degen[vl[0]] == 1) ||
+                      (qm->vType[vl[1]] > 0 && qm->degen[vl[1]] == 1)) {
                         vl[0]++; vl[1]++;
                         EG_centroid(qm, 2, vl, &uv[2], 0);
                    }
@@ -1632,9 +1658,9 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                   if (errbd < EPS08) {
                       res[3 *i0 + 1] = MIN (res[3 *i0 + 1], -angpen);
                       res[3 *i0 + 2] = MIN (res[3 *i0 + 2], -angpen);
-                  } else if  (qInfo[j] < bt || (qm->star[v]-> nQ == 4 && qInfo[qm->star[v]->nQ + j] == 0))
-                       res[3 *i0 + 2] = MIN (res[3 *i0 + 2], errbd * qm->star[v]->ratio[j]);
-                  else res[3 *i0 + 1] = MIN (res[3 *i0 + 1], errbd * qm->star[v]->ratio[j]);
+				  } else if  (qInfo[j] >= bt || (qm->star[v]-> nQ == 4 && qInfo[qm->star[v]->nQ + j] == 1))
+                       res[3 *i0 + 1] = MIN (res[3 *i0 + 1], errbd * qm->star[v]->ratio[j]);
+                  else res[3 *i0 + 2] = MIN (res[3 *i0 + 2], errbd * qm->star[v]->ratio[j]);
 #ifdef DEBUG2
                   printf(" j %d AREA %d RATIO %lf ERRBD %lf res %lf %lf %lf\n",
                          j, qm->star[v]->area[j], qm->star[v]->ratio[j], errbd,
@@ -1694,8 +1720,12 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
 #ifdef DEBUG2
               printf(" LOOKING CAREFULLY :: PASS %d  FULL %d \n", pass, full);
 #endif
-              if (q == 0 && res[4] >= ptol && res[5] >= ptol &&
-                                   (bt < 3 || full   != 1 )) k = 2;
+              if (fabs (res[1] - 1.0) < 1.e-10 && 
+			      fabs (res[2] - 1.0) < 1.e-10 && 
+				  fabs (res[4] - 1.0) < 1.e-10 && 
+				  fabs (res[5] - 1.0) < 1.e-10 ) k = 2;
+			  else if (q == 0 && res[4] >= ptol && res[5] >= ptol &&
+					  (bt < 3 || full   != 1 )) k = 2;
               if (k == 0) {
                   if (res[4] < ptol) {
                       if (res[1] > res[4]) continue;
@@ -1705,7 +1735,17 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                       else if (res[5] < ptol) {
                            if (res[2] > res[5]) continue;
                            k = 1;
-                      } else if (res[2] < ptol || res[1] < ptol || res[4] > res[1]) k = 1;
+                      } 
+					  else if (fabs(res[1] - res[4]) < qEPS) {
+                        //if (res[2] > res[5]) continue;
+						//k = 1;
+						if (res[2] < res[5]) k = 1;
+						else continue;
+					  } else if (fabs(res[2] - res[5]) < qEPS) {
+                        if(res[1] < res[4]) k = 1;
+						else continue;
+					  }
+					  else if (res[2] < ptol || res[1] < ptol || res[4] > res[1]) k = 1;
                   }
               }
           }
@@ -1799,6 +1839,7 @@ int EG_createMeshMap(bodyQuad *bodydata)
           printf("EG_createMeshMap :: EG_getTessFace %d = %d !!\n",f + 1, stat);
           bodydata->qm[f]->fID   = 0;
       }
+      // CHECK TESSELATION IS WELL CONSTRUCTED
       for (q = 0; q < ntri; q++) {
          iA     = tris[3 * q     ] - 1;
          iB     = tris[3 * q  + 1] - 1;
@@ -2101,7 +2142,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList, int full
           if ( qm->vType[i] == -1) mv[kv++] = i;
       for (kq = i = 0 ; i < qm->totQ; i++ )
           if (qm->vType[qm->qIdx[4*i]-1] != -2) qlist[kq++] = i + 1;
-      itMax = 50;
+      itMax = 40;
   }
   area = (int *)EG_alloc(kv * sizeof(int));
   if (area == NULL ) {
@@ -2163,10 +2204,9 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList, int full
       }
   }
   for (it = 0 ; it < itMax; it++) {
-      if (it > 0) pass = 1;
-      if (fullReg == 1 && it == itMax - 3) {
-        fr = 2;
-      }
+      if (it % 2 == 0 && fullReg == 1) pass = -1;
+	  else pass = 1;
+      if (fullReg == 1 && it == itMax - 3) fr = 2;
       for (sum = k = 0 ; k < kv; k++) {
           if (qm->star[mv[k]] ->type <= 0) continue;
           area[k] = EG_placeVertex(qm, mv[k] + 1, pass, fr);
@@ -4274,6 +4314,7 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
 void EG_destroyMeshMap(bodyQuad *bodydata)
 {
   int i, j;
+
   if (bodydata->qm == NULL) return;
   for (i = 0; i < bodydata->nfaces; ++i) {
       if (bodydata->qm[i]) {
@@ -4469,9 +4510,9 @@ static void meshProperties (meshMap *qm, int sweep )
           else                                                quarts[3]++;
           if     (qm->star[k]->ratio[j] < 0.1 ) quarts[4]++;
           else if(qm->star[k]->ratio[j] < 0.25) quarts[5]++;
-          else if(qm->star[k]->ratio[j] < 0.5 ) quarts[6]++;
+          else if(qm->star[k]->ratio[j] < 0.6 ) quarts[6]++;
 		  else if(qm->star[k]->ratio[j] < 0.75) quarts[6]++;
-          else                                    quarts[7]++;
+          else                                  quarts[7]++;
       }
   }
   printf("\n\n FACE %d ---> MIN MAX ANGLES (%lf %lf)   MIN MAX RATIOS (%lf  %lf )\n",
@@ -5292,6 +5333,7 @@ int main (int argc, char *argv[])
   }
   params[0] *= size;
   params[1] *= size;
+  params[0] = 0.200000; params[1] = 0.100000; params[2] = 20.000000;
   if (argc == 3) sscanf(argv[2], "%d", &FACECHOICE);
   if (argc >= 6) sscanf(argv[5], "%d", &FACECHOICE);
   /* get all bodies */
@@ -5310,10 +5352,12 @@ int main (int argc, char *argv[])
 
   /* fill our structure a body at at time */
   for (iBody = 0; iBody < nbody; iBody++) {
-    stat = EG_attributeAdd(bodies[iBody], ".qParams",
-                           ATTRSTRING, 4, NULL, NULL, "off");
-    if (stat != EGADS_SUCCESS)
-        printf(" Body %d: attributeAdd = %d\n", iBody, stat);
+/* FORCE QUADS WITHOUT TEMPLATE */
+    //stat = EG_attributeAdd(bodies[iBody], ".qParams",
+      //                     ATTRSTRING, 4, NULL, NULL, "off");
+    //if (stat != EGADS_SUCCESS)
+      //  printf(" Body %d: attributeAdd = %d\n", iBody, stat);
+/*******************************/
       EG_getTopology(bodies[iBody], &geom, &oclass,
                      &mtype, NULL, &j, &dum, &senses);
       if (mtype == WIREBODY) {
@@ -5417,3 +5461,4 @@ int main (int argc, char *argv[])
   return 0;
 }
 #endif
+
