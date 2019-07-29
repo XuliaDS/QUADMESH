@@ -1242,7 +1242,7 @@ static int EG_projectToTangentPlane(double *normal, double *nO, double *p,
 static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
                                   double *angle)
 {
-  int    stat, skip = 0;
+  int    stat, skip = 0, t1, t2, tc;
   double dot1, dot2, normal[3], cross[3], proj0[3], proj1[3], proj2[3];
   double centre[18], v01[3], v02[3], quv[2], norm1, norm2;
 
@@ -1252,8 +1252,14 @@ static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
   dot1      = centre[3] * centre[3] + centre[4] * centre[4] + centre[5] * centre[5];
   dot2      = centre[6] * centre[6] + centre[7] * centre[7] + centre[8] * centre[8];
   dot1      = sqrt(dot1 * dot2);
+  t1 = MIN(qm-> vType[v1 - 1], 0);
+  t2 = MIN(qm-> vType[v2 - 1], 0);
+  tc = MIN(qm-> vType[vC - 1], 0);
+  if (tc == 0 && qm->degen[vC - 1] == 1) tc++;
+  if (t1 == 0 && qm->degen[v1 - 1] == 1) t1++;
+  if (t2 == 0 && qm->degen[v2 - 1] == 1) t2++;
   // check that it is not singular point. Boundary vertices use also normal plane at a point inside.
-  if (dot1 < qEPS || qm->vType[vC-1] != -1) {
+  if (dot1 < qEPS || tc == 1) {
       if (qm->vType[vC -1] != -1 )
           EG_centroid(qm, 4, &qm->qIdx[4 * (qm->valence[vC -1][0] - 1)], quv, 0);
       else {
@@ -1320,6 +1326,17 @@ static int EG_angleAtVnormalPlane(meshMap *qm, int vC, int v1, int v2,
   if (dot2 < 0 && skip == 0) *angle =  2.0 * PI - *angle;
   return EGADS_SUCCESS;
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 static int EG_angAtBdVert(meshMap *qm, int v, int *links, double *size)
