@@ -1,7 +1,7 @@
 # spheres
 # written by John Dannenhoffer
 
-sphere          0.00      0.00       0.00      1.00
+sphere          0.00      0.00       0.00      0.9
 
 #cut box
      skbeg   -0.7 -1  -0.5 
@@ -24,7 +24,7 @@ extrude         0 0.95 0
 subtract 
 
 
-sphere           0.00      1.25      0.00      0.700
+sphere           0.00      1.25      0.00      0.600
 
 subtract
 

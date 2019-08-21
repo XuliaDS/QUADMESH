@@ -21,10 +21,12 @@
 
 // Solves the square linear system A x = b using simple LU decomposition
 // Returns CAPS_BADVALUE for a singular matrix
+
 int solveLU(int n, double A[], double b[], double x[] )
 {
      int i,j,k;
      double y;
+
      // Compute the LU decomposition in place
      for(k = 0; k < n-1; k++) {
          if (A[k*n+k] == 0) return EGADS_DEGEN;
@@ -54,6 +56,7 @@ int solveLU(int n, double A[], double b[], double x[] )
          }
          x[i] = (x[i]-y)/A[i*n+i];
      }
+
      return EGADS_SUCCESS;
 }
 

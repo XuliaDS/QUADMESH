@@ -1,9 +1,8 @@
 #include "egads.h"
 #include "regQuads.h"
 
-//#define DEBUG
-//#define DEBUG2
-//#define REPORT
+#define DEBUG
+#define REPORT
 
 #ifdef DEBUG
  #define REPORT
@@ -743,11 +742,306 @@ static int EG_restoreQuads(meshMap *qm, Quad *quad, int nq)
   return EGADS_SUCCESS;
 }
 
+// Find the point P = S(u,v) sth sum (P, Qi) = min
+static void EG_eqArc(ego face, int n, const double *uvn, double *uvOUT)
+{
+  int    stat, it, nT = 100, i, ii, j;
+  double tol = 1.e-14, L[2], J[4], *pn = NULL, pIT[18], delta[2], x0, x1, x2,d0[3], k,
+         nrm1, nrm2, uvIT[2], v[3], e1 = -1.0, e2 = -1.0, pv[3], pu[3], puv[3], puu[3], pvv[3], r[3];
+
+  uvIT[0] = uvIT[1] = 0.0;
+  pn      = EG_alloc (n * 18 * sizeof(double));
+  if (pn == NULL ) {
+    printf("Null pointer, return \n");
+    return;
+  }
+  for (stat = j = i = 0 ; i < n; i++) {
+    ii   = 18 * i;
+   stat += EG_evaluate(face, &uvn[2 * i], &pn[ii]);
+   printf(" %lf %lf %lf %lf %lf\n", uvn[2*i], uvn[2*i + 1],pn[ii], pn[ii + 1], pn[ii + 2] );
+   if ( stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+     printf("point data is wrong\n!");
+#endif
+    }
+    nrm1 = pn[ii + 3] * pn[ii + 3] + pn[ii + 4] * pn[ii + 4] +
+           pn[ii + 5] * pn[ii + 5];
+    nrm2 = pn[ii + 6] * pn[ii + 6] + pn[ii + 7] * pn[ii + 7] +
+           pn[ii + 8] * pn[ii + 8];
+    if (nrm1 < 1.e-14 || nrm2 < 1.e-14) continue;
+    uvIT[0] += uvn[2 * i]; uvIT[1] += uvn[2 * i + 1];
+    j++;
+  }
+  uvIT[0] /= (double)j; uvIT[1] /= (double)j;
+  stat  += EG_evaluate(face, uvIT, pIT);
+  if (stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+printf("SOMETHING WENT PRETTY WRONG... Returning uv average\n");
+#endif
+    uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
+  }
+  for (it = 0; it < nT; it++) {
+#ifdef DEBUG
+      printf(" \n\n NEW POINT \n %lf %lf %lf %lf %lf\n",
+      pIT[0], pIT[1], pIT[2], uvIT[0], uvIT[1]);
+        printf(" du  %lf %lf %lf\n dv  %lf %lf %lf\n"
+  " duu %lf %lf %lf\n duv %lf %lf %lf\n"
+  " dvv %lf %lf %lf\n",   pn [3], pIT [4], pIT[5],
+  pIT [6], pIT [7], pIT [8], pIT [9], pIT[10], pIT[11],
+  pIT[12], pIT[13], pIT[14], pIT[15], pIT[16], pIT[17]);
+  printf(" USING %d points \n", n);
+  for (i = 0 ; i < n; i++) {
+    ii = 18 * i;
+    printf("%lf %lf %lf %d\n", pIT[0], pIT[1], pIT[2], 0);
+    printf("%lf %lf %lf %d ", pn[ii], pn[ii + 1], pn[ii + 2], i + 1);
+    r[0] = pIT[0] - pn[ii    ];
+    r[1] = pIT[1] - pn[ii + 1];
+    r[2] = pIT[2] - pn[ii + 2];
+    printf("%lf \n\n\n", DOT(r,r));
+  }
+#endif
+      pu [0] = pIT [3]; pu [1] = pIT [4]; pu [2] = pIT [5];
+      pv [0] = pIT [6]; pv [1] = pIT [7]; pv [2] = pIT [8];
+      puu[0] = pIT [9]; puu[1] = pIT[10]; puu[2] = pIT[11];
+      puv[0] = pIT[12]; puv[1] = pIT[13]; puv[2] = pIT[14];
+      pvv[0] = pIT[15]; pvv[1] = pIT[16]; pvv[2] = pIT[17];
+      L[0]   = L[1] = 0.0;
+      J[0]   = J[1] = J[3] = 0.0;
+      d0[0]  = pIT[0] - pn[0];
+      d0[1]  = pIT[1] - pn[1];
+      d0[2]  = pIT[2] - pn[2];
+      for (i  = 0; i < n; i++) {
+        ii    = 18 * i;
+        r[0]  = pIT[0]     - pn[ii    ];
+        r[1]  = pIT[1]     - pn[ii + 1];
+        r[2]  = pIT[2]     - pn[ii + 2];
+        if (i == 0) k = (2.0 - (double)n) * 0.5;
+        else k = 1.0;//continue;
+        L[0] += k * DOT(pu ,r);
+        L[1] += k * DOT(pv ,r);
+        J[0] += k * (DOT(puu,r) + DOT(pu,pu));
+        J[1] += k * (DOT(puv,r) + DOT(pu,pv));
+        J[3] += k * (DOT(pvv,r) + DOT(pv,pv));
+      }
+      /*
+
+
+        v[0]  = pn[ii    ] - pn[0];
+        v[1]  = pn[ii + 1] - pn[1];
+        v[2]  = pn[ii + 2] - pn[2];
+        x2    = fabs(DOT(r,r) - DOT(d0, d0));
+        L[0] += x2 * DOT(pu ,v);
+        L[1] += x2 * DOT(pv ,v);
+        J[0] += x2 * DOT(puu,v) + DOT(pu,v) * DOT(pu,v);
+        J[1] += x2 * DOT(puv,v) + DOT(pu,v) * DOT(pv,v);
+        J[3] += x2 * DOT(pvv,v) + DOT(pv,v) * DOT(pv,v);
+      }*/
+      J[2]  = J[1];
+      nrm1  = J[0] * J[3] - J[1] * J[2];
+ #ifdef DEBUG
+      printf(" L %lf %lf \n", L[0], L[1]);
+      printf(" JACOBIAN MATRIX 2 x 2 DET %1.2e\n", nrm1);
+      printf(" %lf %lf \n",J[0], J[1]);
+      printf(" %lf %lf \n",J[2], J[3]);
+      printf(" ----------------------\n");
+ #endif
+      if (fabs(nrm1) < 1.e-10) {
+          printf(" IT %d DETERMINANT SIZE %lf  \n", it, nrm1);
+          break;
+      }
+      nrm1      =   1.0 / nrm1;
+      delta[0]  = -nrm1 * ( J[3] * L[0] - J[1] * L[1]);
+      delta[1]  = -nrm1 * (-J[2] * L[0] + J[0] * L[1]);
+      uvIT [0] += delta[0];
+      uvIT [1] += delta[1];
+      x2        = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+      if      (it == 0) x0 = x2;
+      else if (it == 1) x1 = x2;
+      else {
+          e1 = fabs(x1 / x0);
+          e2 = fabs(x2 / x1);
+          x0 = x1;
+          x1 = x2;
+      }
+      stat = EG_evaluate(face, uvIT, pIT);
+      if (stat != EGADS_SUCCESS || x2 < tol ) {
+#ifdef DEBUG
+          printf("EG_evaluate %d  DELTA SIZE %1.2e < %1.2e \n",
+          stat, x2, tol);
+#endif
+          break;
+      }
+#ifdef DEBUG
+      printf(" Xn = (%lf %lf) \nFn = (%lf %lf) \n deltan(%lf %lf) size  %1.2e < %1.2e\n",
+      uvIT[0], uvIT[1], L[0], L[1], delta[0], delta[1], x2, tol );
+#endif
+  }
+  uvOUT[0] = uvIT[0];
+  uvOUT[1] = uvIT[1];
+#ifdef DEBUG
+  printf(" --------------------------------------------------- \n");
+  if (e1 > 0.0 && e2 > 0.0) printf("IT %d CONVERGENCE %lf \n", it, log(e2) / log(e1));
+#endif
+   for ( i = 0 ; i < n; i++) {
+     ii    = 18 * i;
+     r[0]  = pIT[0] - pn[ii    ];
+     r[1]  = pIT[1] - pn[ii + 1];
+     r[2]  = pIT[2] - pn[ii + 2];
+#ifdef DEBUG
+  printf(" P - Q(%d) = %lf\n", i + 1, sqrt (DOT(r,r)));
+#endif
+  }
+  EG_free(pn);
+  return;
+}
+
+
+
+
+
+// Find the point P = S(u,v) sth sum (P, Qi) = min
+static void EG_cent(ego face, int n, const double *uvn, double *uvOUT)
+{
+  int    stat, it, nT = 100, i, ii, j;
+  double tol = 1.e-14, L[2], J[4], *pn = NULL, pIT[18], delta[2], x0, x1, x2,
+         nrm1, nrm2, uvIT[2], e1 = -1.0, e2 = -1.0, pv[3], pu[3], puv[3], puu[3], pvv[3], r[3];
+
+  uvIT[0] = uvIT[1] = 0.0;
+  pn      = EG_alloc (n * 18 * sizeof (double));
+  if (pn == NULL) {
+    printf("Null pointer, return \n");
+    return;
+  }
+  for (stat = j = i = 0 ; i < n; i++) {
+    ii = 18 * i;
+   stat += EG_evaluate(face, &uvn[2 * i], &pn[ii]);
+   if ( stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+     printf("point data is wrong\n!");
+#endif
+    }
+    nrm1 = pn[ii + 3] * pn[ii + 3] + pn[ii + 4] * pn[ii + 4] +
+           pn[ii + 5] * pn[ii + 5];
+    nrm2 = pn[ii + 6] * pn[ii + 6] + pn[ii + 7] * pn[ii + 7] +
+           pn[ii + 8] * pn[ii + 8];
+    if (nrm1 < 1.e-14 || nrm2 < 1.e-14) continue;
+    uvIT[0] += uvn[2 * i]; uvIT[1] += uvn[2 * i + 1];
+    j++;
+  }
+  uvIT[0] /= (double)j; uvIT[1] /= (double)j;
+  stat  += EG_evaluate(face, uvIT, pIT);
+  if (stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+printf("SOMETHING WENT PRETTY WRONG... Returning uv average\n");
+#endif
+    uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
+  }
+  for (it = 0; it < nT; it++) {
+#ifdef DEBUG
+      printf(" \n\n qt 3 NEW POINT \n %lf %lf %lf %lf %lf\n",
+      pIT[0], pIT[1], pIT[2], uvIT[0], uvIT[1]);
+        printf(" du  %lf %lf %lf\n dv  %lf %lf %lf\n"
+  " duu %lf %lf %lf\n duv %lf %lf %lf\n"
+  " dvv %lf %lf %lf\n",   pn [3], pIT [4], pIT[5],
+  pIT [6], pIT [7], pIT [8], pIT [9], pIT[10], pIT[11],
+  pIT[12], pIT[13], pIT[14], pIT[15], pIT[16], pIT[17]);
+#endif
+      pu [0] = pIT [3]; pu [1] = pIT [4]; pu [2] = pIT [5];
+      pv [0] = pIT [6]; pv [1] = pIT [7]; pv [2] = pIT [8];
+      puu[0] = pIT [9]; puu[1] = pIT[10]; puu[2] = pIT[11];
+      puv[0] = pIT[12]; puv[1] = pIT[13]; puv[2] = pIT[14];
+      pvv[0] = pIT[15]; pvv[1] = pIT[16]; pvv[2] = pIT[17];
+      L[0] = L[1] = 0.0;
+      J[0] = J[1] = J[2] = J[3] = 0.0;
+      for (i = 0; i < n; i++) {
+        ii   = 18 * i;
+        r[0] = pIT[0] - pn[ii    ];
+        r[1] = pIT[1] - pn[ii + 1];
+        r[2] = pIT[2] - pn[ii + 2];
+        L[0] += DOT(pu ,r); L[1] += DOT(pv ,r);
+        J[0] += DOT(puu,r); J[1] += DOT(puv,r);
+        J[3] += DOT(pvv,r);
+      }
+      J[0] += (double)n * DOT(pu, pu);
+      J[1] += (double)n * DOT(pu, pv);
+      J[3] += (double)n * DOT(pv, pv);
+      J[2]  = J[1];
+      nrm1  = J[0] * J[3] - J[1] * J[2];
+ #ifdef DEBUG
+      printf(" JACOBIAN MATRIX 2 x 2 DET %1.2e\n", nrm1);
+      printf(" %lf %lf \n",J[0], J[1]);
+      printf(" %lf %lf \n",J[2], J[3]);
+      printf(" ----------------------\n");
+ #endif
+      if (fabs(nrm1) < 1.e-10) {
+          printf(" IT %d DETERMINANT SIZE %lf  \n", it, nrm1);
+          break;
+      }
+      nrm1      =   1.0 / nrm1;
+      delta[0]  = -nrm1 * ( J[3] * L[0] - J[1] * L[1]);
+      delta[1]  = -nrm1 * (-J[2] * L[0] + J[0] * L[1]);
+      uvIT [0] += delta[0];
+      uvIT [1] += delta[1];
+      x2        = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+      if      (it == 0) x0 = x2;
+      else if (it == 1) x1 = x2;
+      else {
+          e1 = fabs(x1 / x0);
+          e2 = fabs(x2 / x1);
+          x0 = x1;
+          x1 = x2;
+      }
+      stat = EG_evaluate(face, uvIT, pIT);
+      if (stat != EGADS_SUCCESS || x2 < tol ) {
+#ifdef DEBUG
+          printf("EG_evaluate %d  DELTA SIZE %1.2e < %1.2e \n",
+          stat, x2, tol);
+#endif
+          break;
+      }
+#ifdef DEBUG
+      printf(" Xn = (%lf %lf) Fn = (%lf %lf) Deltan(%lf %lf) size  %1.2e < %1.2e\n",
+      uvn[0], uvn[1], L[0], L[1], delta[0], delta[1], x2, tol );
+#endif
+  }
+  uvOUT[0] = uvIT[0];
+  uvOUT[1] = uvIT[1];
+#ifdef DEBUG
+  printf(" --------------------------------------------------- \n");
+  if (e1 > 0.0 && e2 > 0.0) printf("IT %d CONVERGENCE %lf \n", it, log(e2) / log(e1));
+#endif
+   for ( i = 0 ; i < n; i++) {
+     ii    = 18 * i;
+     r[0]  = pIT[0] - pn[ii    ];
+     r[1]  = pIT[1] - pn[ii + 1];
+     r[2]  = pIT[2] - pn[ii + 2];
+#ifdef DEBUG
+  printf(" P - Q(%d) = %lf\n", i + 1, sqrt (DOT(r,r)));
+#endif
+  }
+  EG_free(pn);
+  return;
+}
+
+
+
+
+
 
 static void EG_centroid(meshMap *qm, int n, int *list, double *uvOUT, int usequv)
 {
   int i, sumuv = 0,  sumxyz = 0;
-  double  xyz0[18], xyz1[18], uv[2];
+  double  xyz0[18], xyz1[18],uv[2]; /**uv = NULL;
+
+  uv = EG_alloc(2 * n * sizeof (double));
+  if (uv == NULL) return;
+  for (i = 0; i < n; i++) {
+    uv[2 * i    ] = qm->uvs [2 * (list[i] - 1)    ];
+    uv[2 * i + 1] = qm->uvs [2 * (list[i] - 1) + 1];
+  }
+  EG_eqArc(qm->face, n, uv, uvOUT);
+  EG_free(uv);
+  return;*/
 
   if (usequv == 1) {
       uv[0] = uvOUT[0];
@@ -1175,7 +1469,7 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
                         if (DOT(vn, cross) < 0.0) s2 = 1;
                         if ((cw == 0 && s1 == 0 && s2 == 0) ||
                             (cw == 1 && s1 == 1 && s2 == 1)) {
-                              selfint = 2;
+                                qm->star[vID-1]->area[s] = QACB;
 #ifdef DEBUG
                           printf(" Alert! QUAD %d LINK %d %d CROSSES THE DOMAIN BOUNDS ! REJECT\n ",
                                   qm->star[vID-1]->quads[s], qV[vB] + 1, qV[vC] + 1);
@@ -1197,8 +1491,10 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
          count++;
        }
        qm->star[vID-1]->angle[s] = ang[iv];
-       if      (selfint == 1) qm->star[vID-1]->area[s] = QA3;
-       else if (count   != 4) qm->star[vID-1]->area[s] = QA1;
+       if (qm->star[vID-1]->area[s] == QA0 ) {
+           if (selfint == 1 || count  < 2) qm->star[vID-1]->area[s] = QA3;
+           else if (         count   != 4) qm->star[vID-1]->area[s] = QA1;
+       }
        // now look for special cases: sharp interior corners, boundary quads...
        vr[0] = vr[1] = 0.0;
        qa[0] = tria[0] + tria[2];
@@ -1232,7 +1528,7 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
                  qm->star[vID-1]->ratio[s] = vr[0];
            }
        }
-       if (selfint == 2 || (selfint == 1 && bvp >= 4) ) qm->star[vID-1]->area[s] = QACB;
+       if (selfint == 1 && bvp >= 4) qm->star[vID-1]->area[s] = QACB;
        if (qm->star[vID-1]->area[s] >= QA3) qm->star[vID-1]->ratio[s] = -qm->star[vID-1]->angle[s];
        if (doublet == 1) {
            if (qm->star[vID-1]->area [s] < QA3) {
@@ -1288,7 +1584,7 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
 static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   int q, v, j, i, k, *vl = NULL, ta[2], v1, v2, v3, corner, vla = 0,
       la = -1, lb, nt, block = 0, round, doublet = 0, bt = -1, i0;
-  double uv[4], res[6], angopt =0.0, angpen, errbd, ptol = 0.25, auxd, normal[6];
+  double uv[4], res[6], angopt =0.0, angpen, errbd, ptol = 0.25, auxd, normal[6], *uvs = NULL;
   int *qInfo = NULL;
 #ifdef DEBUG2
   char buffer[100];
@@ -1338,7 +1634,8 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   }
   qInfo  = (int*) EG_alloc(2 * qm->star[v]->nQ * sizeof(int));
   vl     = (int*) EG_alloc(    qm->star[v]->nV * sizeof(int));
-  if (qInfo == NULL || vl == NULL) return EGADS_MALLOC;
+  uvs    = (double*)EG_alloc(2* qm->star[v]->nQ * sizeof(double));
+  if (qInfo == NULL || vl == NULL || uvs == NULL) return EGADS_MALLOC;
   corner = k = -1;
   bt     = qm->star[v]->type;
   if (bt >= 0) {
@@ -1350,6 +1647,7 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
       qInfo[i] = k;
       vl   [i] = 0;
       v1       = qm->star[v]->verts[qm->star[v]->idxV[2 *i + 1]] - 1;
+      uvs[2 * i] = qm->uvs[2 * v1] ;uvs[2 * i + 1] = qm->uvs[2 * v1 + 1] ;
       v2       = qm->star[v]->verts[qm->star[v]->idxV[2 *i + 2]] - 1;
       v3       = qm->star[v]->verts[qm->star[v]->idxV[2 *i + 3]] - 1;
       if (qm->vType[v1] > 0) {
@@ -1417,8 +1715,7 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   for (i0 = round = 0; round < 2; round++) {
       for (q = 0; q <= nt; q++) {
           if (i0 == 1) {
-              if (q > 0 && (block > 0 || pass == -1 ||
-                             qm-> star[v]->nQ == 3 )) break;
+              if (q > 0 && (block > 0 || qm-> star[v]->nQ == 3 )) break;
 #ifdef DEBUG2
               printf ("\n\n PLACEVERT ROUND %d la %d q %d / %d PASS %d block %d\n ",
               round, la, q, nt, pass, block);
@@ -1427,8 +1724,10 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
               if (q == 0) {
                 uv[2] = uv[0];
                 uv[3] = uv[1];
-                EG_centroid (qm, qm->star[v]->nQ, &qm->valence[v][3], &uv[2], (round+1)%2);
-                if (la != -1 && ta[0] == QA0) {
+                if (ta[0] == QA0) EG_eqArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                else              EG_centroid (qm, qm->star[v]->nQ, &qm->valence[v][3], &uv[2], (round+1)%2);
+                if (la != -1 && ta[0] == QA0 && qm->bdAng[vla] > 3.9 &&
+                       qm->degen[vla] == 0) {
                     if (qm->star[v]-> nQ != 4 || full != 2) continue;
                     uv[2] = 0.5 * uv[0] + 0.5 * uv[2];
                     uv[3] = 0.5 * uv[1] + 0.5 * uv[3];
@@ -1598,8 +1897,15 @@ printf(" DOMINANT ANGLE %lf MAX ANGLE %lf\n", errbd, auxd);
 #endif
           // compare areas and see if we should update
           k = 0;
-          if (pass == -1) {
+          /*if (pass == -1) {
               if (la == -1 && (ta[1] < QA2 || (qm->pp == 1 && ta[1] <= QA2))) {
+	            k = 2;
+                block = 1;
+	          }
+          }*/
+          if (pass == -1) {
+              if ((bt == 2 &&  ta[1] == QA0) ||
+                  (bt  < 2 && (ta[1]   < QA2 || (qm->pp == 1 && ta[1] <= QA2)))) {
 	            k = 2;
                 block = 1;
 	          }
@@ -1747,6 +2053,11 @@ int EG_createMeshMap(bodyQuad *bodydata)
          u02[2] = xyzs[3 * iC + 2] - xyzs[3 * iA + 2];
          CROSS(u01, u02, uC);
          norm1   = sqrt(uC[0] * uC[0] + uC[1] * uC[1] + uC[2] * uC[2]);
+         if ( norm1 == 0. ) {
+            printf(" \n EG_createMeshMap FACE %d TRI %d, zero area !!!\n",
+            f +1, q + 1 );
+            bodydata->qm[f]->fID       = 0;
+         }
          uC[0] /= norm1;
          uC[1] /= norm1;
          uC[2] /= norm1;
@@ -1766,6 +2077,11 @@ int EG_createMeshMap(bodyQuad *bodydata)
            v02[2] = xyzs[3 * iC + 2] - xyzs[3 * iA + 2];
            CROSS(v01, v02, vC);
            norm1  = sqrt(vC[0] * vC[0] + vC[1] * vC[1] + vC[2] * vC[2]);
+           if ( norm1 == 0. ) {
+              printf(" \n EG_createMeshMap FACE %d TRI %d, zero area !!!\n",
+              f +1, k + 1 );
+              bodydata->qm[f]->fID       = 0;
+           }
            vC[0] /= norm1;
            vC[1] /= norm1;
            vC[2] /= norm1;
@@ -5250,10 +5566,10 @@ int main (int argc, char *argv[])
   /* fill our structure a body at at time */
   for (iBody = 0; iBody < nbody; iBody++) {
       /* FORCE QUADS FOR DEBUG MODE: IF WANTED uncomment the 4 lines */
-    /*stat = EG_attributeAdd(bodies[iBody], ".qParams",
+    stat = EG_attributeAdd(bodies[iBody], ".qParams",
                            ATTRSTRING, 4, NULL, NULL, "off");
     if (stat != EGADS_SUCCESS)
-        printf(" Body %d: attributeAdd = %d\n", iBody, stat);*/
+        printf(" Body %d: attributeAdd = %d\n", iBody, stat);
       EG_getTopology(bodies[iBody], &geom, &oclass,
                      &mtype, NULL, &j, &dum, &senses);
       if (mtype == WIREBODY) {

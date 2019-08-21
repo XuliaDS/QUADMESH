@@ -1,0 +1,273 @@
+/* P such that splits uv0 and uv2 in fact1, 1-fact1 and
+               splits uv1 and uv3 in fact2, 1-fact2 and
+               with minimum distance
+*/
+static
+void EG_minArc4(const ego face,  double fact1,  double fact2, const double *uv0,
+                const double *uv1, const double *uv2, const double *uv3, double *uvOUT)
+{
+  int    i, it, nT = 100, stat;
+  double x2, l[4], p0[18], p2[18], p1[18], p3[18], pIT[18], J[16], JI[16], L[4], Pu0[3], Pu1[3],
+         Pu2[3], Pu3[3], Pv0[3], Pv1[3], Pv2[3], Pv3[3], delta[4], det, k02, k13, d0, d1, d2, d3,
+         aux0[3], aux1[3], aux2[3], aux3[3], r0[3], r1[3], r2[3], r3[3], uvIT[4], range[4], pOUT[18];
+ #ifdef DEBUG
+     double e1 = 0.0, e2 = 0.0, lt02, lt13, x1, x0;
+#endif
+  stat = EG_getRange(face, range, &it);
+  if (stat != EGADS_SUCCESS) {
+    printf(" EG_getSidepoint: EG_egetRange %d !!\n ", stat);
+    return;
+  }
+  //Initial guess uv = 0.5 (uv0 + uv1)
+  uvIT[0] = 0.25 * (uv0[0] + uv1[0] + uv2[0] + uv3[0]);
+  uvIT[1] = 0.25 * (uv0[1] + uv1[1] + uv2[1] + uv3[1]);
+  uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
+  uvIT[2] = uvIT[3] = 0.0;
+  i       = EG_evaluate(face, uv0, p0);
+  i      += EG_evaluate(face, uv1, p1);
+  i      += EG_evaluate(face, uv2, p2);
+  i      += EG_evaluate(face, uv3, p3);
+  i      += EG_evaluate(face, uvIT, pIT);
+#ifdef DEBUG
+  printf("%lf %lf %lf 1\n",  p0[0],  p0[1],  p0[2]);
+  printf("%lf %lf %lf 2\n",  p1[0],  p1[1],  p1[2]);
+  printf("%lf %lf %lf 3\n",  p2[0],  p2[1],  p2[2]);
+  printf("%lf %lf %lf 4\n",  p3[0],  p3[1],  p3[2]);
+  printf("%lf %lf %lf 4\n", pIT[0], pIT[1], pIT[2]);
+#endif
+  if (i  != EGADS_SUCCESS) {
+   printf(" EG_minArc :: EG_evaluate %d !!\n ", i);
+   return;
+  }
+#ifdef DEBUG
+  r0[0] = pIT[0] - p0[0]; r0[1] = pIT[1] - p0[1]; r0[2] = pIT[2] - p0[2];
+  r1[0] = pIT[0] - p1[0]; r1[1] = pIT[1] - p1[1]; r1[2] = pIT[2] - p1[2];
+  r2[0] = pIT[0] - p2[0]; r2[1] = pIT[1] - p2[1]; r2[2] = pIT[2] - p2[2];
+  r3[0] = pIT[0] - p3[0]; r3[1] = pIT[1] - p3[1]; r3[2] = pIT[2] - p3[2];
+  l [0] = DOT(r0, r0); l [1] = DOT(r1, r1);
+  l [2] = DOT(r2, r2); l [3] = DOT(r3, r3);
+  l[0]  = sqrt(l[0]);
+  l[1]  = sqrt(l[1]);
+  l[2]  = sqrt(l[2]);
+  l[3]  = sqrt(l[3]);
+  lt02  = l[0] + l[2];
+  lt13  = l[1] + l[3];
+  printf(" Initial Guess As distances sqrt(l0) = %lf sqrt (l1) %lf\n ratios %lf %lf (EXPECTED %lf %lf)\n",
+           l[0], l[2], l[0] / lt02, l[2]/lt02, fact1, (1.0 - fact1));
+  printf(" As distances sqrt(l0) = %lf sqrt (l1) %lf\n ratios %lf %lf (EXPECTED %lf %lf)\n",
+           l[1], l[3], l[1] / lt02, l[3]/lt02, fact2, (1.0 - fact2));
+  printf(" --------------------------------------------------- \n");
+#endif
+  k02 = (fact1 * fact1) / ((1.0 - fact1) * (1.0 - fact1)) ;
+  k13 = (fact2 * fact2) / ((1.0 - fact2) * (1.0 - fact2));
+  for (it   = 0; it < nT; it++) {
+      r0[0] = pIT[0] - p0[0]; r0[1] = pIT[1] - p0[1]; r0[2] = pIT[2] - p0[2];
+      r1[0] = pIT[0] - p1[0]; r1[1] = pIT[1] - p1[1]; r1[2] = pIT[2] - p1[2];
+
+      r2[0] = pIT[0] - p2[0]; r2[1] = pIT[1] - p2[1]; r2[2] = pIT[2] - p2[2];
+      r3[0] = pIT[0] - p3[0]; r3[1] = pIT[1] - p3[1]; r3[2] = pIT[2] - p3[2];
+
+      l [0] = DOT(r0, r0); l [1] = DOT(r1, r1);
+      l [2] = DOT(r2, r2); l [3] = DOT(r3, r3);
+      #ifdef DEBUGG
+        printf("%lf %lf %lf 1\n",  p0[0],  p0[1],  p0[2]);
+        printf("%lf %lf %lf 2\n",  p1[0],  p1[1],  p1[2]);
+        printf("%lf %lf %lf 3\n",  p2[0],  p2[1],  p2[2]);
+        printf("%lf %lf %lf 4\n",  p3[0],  p3[1],  p3[2]);
+        printf("%lf %lf %lf 4\n", pIT[0], pIT[1], pIT[2]);
+      #endif
+      d0 = 1.0 + uvIT[2];
+      d1 = 1.0 + uvIT[3];
+      d2 = 1.0 - k02 * uvIT[2];
+      d3 = 1.0 - k13 * uvIT[3];
+      Pu0[0] = pIT[3]; Pu0[1] = pIT[4]; Pu0[2] = pIT[5];
+      Pu1[0] = pIT[3]; Pu1[1] = pIT[4]; Pu1[2] = pIT[5];
+      Pu2[0] = pIT[3]; Pu2[1] = pIT[4]; Pu2[2] = pIT[5];
+      Pu3[0] = pIT[3]; Pu3[1] = pIT[4]; Pu3[2] = pIT[5];
+
+      Pv0[0] = pIT[6]; Pv0[1] = pIT[7]; Pv0[2] = pIT[8];
+      Pv1[0] = pIT[6]; Pv1[1] = pIT[7]; Pv1[2] = pIT[8];
+      Pv2[0] = pIT[6]; Pv2[1] = pIT[7]; Pv2[2] = pIT[8];
+      Pv3[0] = pIT[6]; Pv3[1] = pIT[7]; Pv3[2] = pIT[8];
+
+      L[0]   = d0 * DOT(Pu0, r0) + d1 * DOT(Pu1, r1) +
+               d2 * DOT(Pu2, r2) + d3 * DOT(Pu3, r3);
+      L[1]   = d0 * DOT(Pv0, r0) + d1 * DOT(Pv1, r1) +
+               d2 * DOT(Pv2, r2) + d3 * DOT(Pv3, r3);
+      L[2]   = 0.5 * (l[0] - k02 * l[2]);
+      L[3]   = 0.5 * (l[1] - k13 * l[3]);
+
+      aux0[0] = pIT[9]; aux0[1] = pIT[10]; aux0[2] = pIT[11];
+      aux1[0] = pIT[9]; aux1[1] = pIT[10]; aux1[2] = pIT[11];
+      aux2[0] = pIT[9]; aux2[1] = pIT[10]; aux2[2] = pIT[11];
+      aux3[0] = pIT[9]; aux3[1] = pIT[10]; aux3[2] = pIT[11];
+      J[0]    = d0 * (DOT(Pu0, Pu0) + DOT(aux0, r0)) +
+                d1 * (DOT(Pu1, Pu1) + DOT(aux1, r1)) +
+                d2 * (DOT(Pu2, Pu2) + DOT(aux2, r2)) +
+                d3 * (DOT(Pu3, Pu3) + DOT(aux3, r3)) ;
+      aux0[0] = pIT[12]; aux0[1] = pIT[13]; aux0[2] = pIT[14];
+      aux1[0] = pIT[12]; aux1[1] = pIT[13]; aux1[2] = pIT[14];
+      aux2[0] = pIT[12]; aux2[1] = pIT[13]; aux2[2] = pIT[14];
+      aux3[0] = pIT[12]; aux3[1] = pIT[13]; aux3[2] = pIT[14];
+      J[1]    = d0 * (DOT(Pu0, Pv0) + DOT(aux0, r0)) +
+                d1 * (DOT(Pu1, Pv1) + DOT(aux1, r1)) +
+                d2 * (DOT(Pu2, Pv2) + DOT(aux2, r2)) +
+                d3 * (DOT(Pu3, Pv3) + DOT(aux3, r3)) ;
+      aux0[0] = pIT[15]; aux0[1] = pIT[16]; aux0[2] = pIT[17];
+      aux1[0] = pIT[15]; aux1[1] = pIT[16]; aux1[2] = pIT[17];
+      aux2[0] = pIT[15]; aux2[1] = pIT[16]; aux2[2] = pIT[17];
+      aux3[0] = pIT[15]; aux3[1] = pIT[16]; aux3[2] = pIT[17];
+      J[5]    = d0 * (DOT(Pv0, Pv0) + DOT(aux0, r0)) +
+                d1 * (DOT(Pv1, Pv1) + DOT(aux1, r1)) +
+                d2 * (DOT(Pv2, Pv2) + DOT(aux2, r2)) +
+                d3 * (DOT(Pv3, Pv3) + DOT(aux3, r3)) ;
+      J [2 ]  = DOT(Pu0, r0) - k02 * DOT(Pu2, r2);
+      J [3 ]  = DOT(Pu1, r1) - k13 * DOT(Pu3, r3);
+      J [6 ]  = DOT(Pv0, r0) - k02 * DOT(Pv2, r2);
+      J [7 ]  = DOT(Pv1, r1) - k13 * DOT(Pv3, r3);
+      J [4 ]  = J [1];
+      J [8 ]  = J [2];
+      J [9 ]  = J [6];
+      J [12]  = J [3];
+      J [13]  = J [7];
+      J [10]  = J [11] = J [14] = J [15] = 0.0;
+      JI[0 ] = J[6] * J[11] * J[13] - J[ 7] * J[10] * J[13] + J[ 7] * J[ 9] * J[14] -
+               J[5] * J[11] * J[14] - J[ 6] * J[ 9] * J[15] + J[ 5] * J[10] * J[15];
+      JI[1 ] = J[3] * J[10] * J[13] - J[ 2] * J[11] * J[13] - J[ 3] * J[ 9] * J[14] +
+               J[1] * J[11] * J[14] + J[ 2] * J[ 9] * J[15] - J[ 1] * J[10] * J[15];
+      JI[2 ] = J[2] * J[ 7] * J[13] - J[ 3] * J[ 6] * J[13] + J[ 3] * J[ 5] * J[14] -
+               J[1] * J[ 7] * J[14] - J[ 2] * J[ 5] * J[15] + J[ 1] * J[ 6] * J[15];
+      JI[3 ] = J[3] * J[ 6] * J[ 9] - J[ 2] * J[ 7] * J[ 9] - J[ 3] * J[ 5] * J[10] +
+               J[1] * J[ 7] * J[10] + J[ 2] * J[ 5] * J[11] - J[ 1] * J[ 6] * J[11];
+      JI[4 ] = J[7] * J[10] * J[12] - J[ 6] * J[11] * J[12] - J[ 7] * J[ 8] * J[14] +
+               J[4] * J[11] * J[14] + J[ 6] * J[ 8] * J[15] - J[ 4] * J[10] * J[15];
+      JI[5 ] = J[2] * J[11] * J[12] - J[ 3] * J[10] * J[12] + J[ 3] * J[ 8] * J[14] -
+               J[0] * J[11] * J[14] - J[ 2] * J[ 8] * J[15] + J[ 0] * J[10] * J[15];
+      JI[6 ] = J[3] * J[ 6] * J[12] - J[ 2] * J[ 7] * J[12] - J[ 3] * J[4] * J[14] +
+               J[0] * J[ 7] * J[14] + J[ 2] * J[ 4] * J[15] - J[ 0] * J[6] * J[15];
+      JI[7 ] = J[2] * J[ 7] * J[ 8] - J[ 3] * J[ 6] * J[ 8] + J[ 3] * J[4] * J[10] -
+               J[0] * J[ 7] * J[10] - J[ 2] * J[ 4] * J[11] + J[ 0] * J[6] * J[11];
+      JI[8 ] = J[5] * J[11] * J[12] - J[ 7] * J[ 9] * J[12] + J[ 7] * J[8] * J[13] -
+               J[4] * J[11] * J[13] - J[ 5] * J[ 8] * J[15] + J[ 4] * J[9] * J[15];
+      JI[9 ] = J[3] * J[ 9] * J[12] - J[ 1] * J[11] * J[12] - J[ 3] * J[8] * J[13] +
+               J[0] * J[11] * J[13] + J[ 1] * J[ 8] * J[15] - J[ 0] * J[9] * J[15];
+      JI[10] = J[1] * J[ 7] * J[12] - J[ 3] * J[ 5] * J[12] + J[ 3] * J[4] * J[13] -
+               J[0] * J[ 7] * J[13] - J[ 1] * J[ 4] * J[15] + J[ 0] * J[5] * J[15];
+      JI[11] = J[3] * J[ 5] * J[ 8] - J[ 1] * J[ 7] * J[ 8] - J[ 3] * J[4] * J[ 9] +
+               J[0] * J[ 7] * J[ 9] + J[ 1] * J[ 4] * J[11] - J[ 0] * J[5] * J[11];
+      JI[12] = J[6] * J[ 9] * J[12] - J[ 5] * J[10] * J[12] - J[ 6] * J[8] * J[13] +
+               J[4] * J[10] * J[13] + J[ 5] * J[ 8] * J[14] - J[ 4] * J[9] * J[14];
+      JI[13] = J[1] * J[10] * J[12] - J[ 2] * J[ 9] * J[12] + J[ 2] * J[8] * J[13] -
+               J[0] * J[10] * J[13] - J[ 1] * J[ 8] * J[14] + J[ 0] * J[9] * J[14];
+      JI[14] = J[2] * J[ 5] * J[12] - J[ 1] * J[ 6] * J[12] - J[ 2] * J[4] * J[13] +
+               J[0] * J[ 6] * J[13] + J[ 1] * J[ 4] * J[14] - J[ 0] * J[5] * J[14];
+      JI[15] = J[1] * J[ 6] * J[ 8] - J[ 2] * J[ 5] * J[ 8] + J[ 2] * J[4] * J[ 9] -
+               J[0] * J[ 6] * J[ 9] - J[ 1] * J[ 4] * J[10] + J[ 0] * J[5] * J[10];
+      det    = J[3] * J[ 6] * J[ 9] * J[12] - J[ 2] * J[ 7] * J[ 9] * J[12] -
+               J[3] * J[ 5] * J[10] * J[12] + J[ 1] * J[ 7] * J[10] * J[12] +
+               J[2] * J[ 5] * J[11] * J[12] - J[ 1] * J[ 6] * J[11] * J[12] -
+               J[3] * J[ 6] * J[ 8] * J[13] + J[ 2] * J[ 7] * J[ 8] * J[13] +
+               J[3] * J[ 4] * J[10] * J[13] - J[ 0] * J[ 7] * J[10] * J[13] -
+               J[2] * J[ 4] * J[11] * J[13] + J[ 0] * J[ 6] * J[11] * J[13] +
+               J[3] * J[ 5] * J[ 8] * J[14] - J[ 1] * J[ 7] * J[ 8] * J[14] -
+               J[3] * J[ 4] * J[ 9] * J[14] + J[ 0] * J[ 7] * J[ 9] * J[14] +
+               J[1] * J[ 4] * J[11] * J[14] - J[ 0] * J[ 5] * J[11] * J[14] -
+               J[2] * J[ 5] * J[ 8] * J[15] + J[ 1] * J[ 6] * J[ 8] * J[15] +
+               J[2] * J[ 4] * J[ 9] * J[15] - J[ 0] * J[ 6] * J[ 9] * J[15] -
+               J[1] * J[ 4] * J[10] * J[15] + J[ 0] * J[ 5] * J[10] * J[15];
+     det    = 1.0 / det;
+#ifdef DEBUGG
+    printf(" Jacobian   \n");
+    printf("   %lf %lf %lf %lf \n", J [0] , J [1], J [2] , J [3]);
+    printf("   %lf %lf %lf %lf \n", J [4] , J [5], J [6] , J [7]);
+    printf("   %lf %lf %lf %lf \n", J [8] , J [9], J [10], J [11]);
+    printf("   %lf %lf %lf %lf \n", J [12],J [13], J [14], J [15]);
+    printf("\n INVERSE JACOBIAN MATRIX ORI DET %1.12e \n", det);
+    printf(" %lf %lf %lf %lf\n",JI[0]*det, JI[1]*det, JI[2]*det, JI[3]*det);
+    printf(" %lf %lf %lf %lf\n",JI[4]*det, JI[5]*det, JI[6]*det, JI[7]*det);
+    printf(" %lf %lf %lf %lf\n",JI[8]*det, JI[9]*det, JI[10]*det, JI[11]*det);
+    printf(" %lf %lf %lf %lf\n",JI[12]*det, JI[13]*det, JI[14]*det, JI[15]*det);
+    printf(" ----------------------\n");
+    printf(" L %lf %lf %lf %lf \n", L[0], L[1], L[2], L[3]);
+#endif
+      delta[0]  = det * (JI[0 ] * L[0] + JI[1 ] * L[1] + JI[2 ] * L[2] + JI[ 3] * L[3]);
+      delta[1]  = det * (JI[4 ] * L[0] + JI[5 ] * L[1] + JI[6 ] * L[2] + JI[ 7] * L[3]);
+      delta[2]  = det * (JI[8 ] * L[0] + JI[9 ] * L[1] + JI[10] * L[2] + JI[11] * L[3]);
+      delta[3]  = det * (JI[12] * L[0] + JI[13] * L[1] + JI[14] * L[2] + JI[15] * L[3]);
+      uvIT[0]  -= delta[0];
+      uvIT[1]  -= delta[1];
+      uvIT[2]  -= delta[2];
+      uvIT[3]  -= delta[3];
+      if(uvIT[0] < range[0] || uvIT[0] > range[1] ||
+         uvIT[1] < range[2] || uvIT[1] > range[3]) {
+           pIT[0]  = 0.25*(p0[0] + p1[0] + p2[0] + p3[0]);
+           pIT[1]  = 0.25*(p0[1] + p1[1] + p2[1] + p3[1]);
+           pIT[2]  = 0.25*(p0[2] + p1[2] + p2[2] + p3[2]);
+           uvIT[0] = uvOUT[0]; uvIT[1] = uvOUT[1];
+           stat    = EG_invEvaluateGuess(face, pIT, uvIT, pOUT);
+           if (stat != EGADS_SUCCESS ||
+                  uvIT[0] < range[0] || uvIT[0] > range[1] ||
+                  uvIT[1] < range[2] || uvIT[1] > range[3]) {
+                    stat      = EG_invEvaluate(face, pIT, uvIT, pOUT);
+                    if (stat != EGADS_SUCCESS ||
+                           uvIT[0] < range[0] || uvIT[0] > range[1] ||
+                           uvIT[1] < range[2] || uvIT[1] > range[3]) return;
+                    uvOUT[0] = uvIT[0];
+                    uvOUT[1] = uvIT[1];
+                    /* we are hopelessly out of range... */
+                    return;
+          }
+    }
+    x2        = sqrt(DOT4(delta, delta));
+#ifdef DEBUG
+      if      (it == 0) x0 = x2;
+      else if (it == 1) x1 = x2;
+      else {
+          e1 = fabs(x1 / x0);
+          e2 = fabs(x2 / x1);
+          x0 = x1;
+          x1 = x2;
+      }
+#endif
+      i = EG_evaluate(face, uvIT, pIT);
+#ifdef DEBUGG
+      printf(" NEW POINT %lf %lf %lf\n", pIT[0], pIT[1], pIT[2]);
+      printf("du  %lf %lf %lf dv %lf %lf %lf\n", pIT[3], pIT[4], pIT[5], pIT[6], pIT[7], pIT[8]);
+      printf("duu %lf %lf %lf duv %lf %lf %lf dvv %lf %lf %lf\n", pIT[9], pIT[10], pIT[11], pIT[12], pIT[13], pIT[14], pIT[15], pIT[16], pIT[17]);
+#endif
+      if (i != EGADS_SUCCESS || x2 < 1.e-10 ) break;
+  }
+#ifdef DEBUG
+  printf("\n\n--------------- REPORT MIN ARC 4------------------------------------ \n");
+  if (i != EGADS_SUCCESS) printf("EG_minArc4: EG_evaluate %d !!\n", i);
+  printf("IT %d DELTA SIZE %1.2e < %1.2e n", it, x2, 1.e-10);
+  if (e1 > 1.e-10 && e2 > 1.e-10)
+      printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
+  r0[0] = pIT[0] - p0[0]; r0[1] = pIT[1] - p0[1]; r0[2] = pIT[2] - p0[2];
+  r1[0] = pIT[0] - p1[0]; r1[1] = pIT[1] - p1[1]; r1[2] = pIT[2] - p1[2];
+  r2[0] = pIT[0] - p2[0]; r2[1] = pIT[1] - p2[1]; r2[2] = pIT[2] - p2[2];
+  r3[0] = pIT[0] - p3[0]; r3[1] = pIT[1] - p3[1]; r3[2] = pIT[2] - p3[2];
+  l [0] = DOT(r0, r0); l[1] = DOT(r1, r1);
+  l [2] = DOT(r2, r2); l[3] = DOT(r3, r3);
+  l [0] = sqrt(l[0]); l[1]  = sqrt(l[1]);
+  l [2] = sqrt(l[2]); l[3]  = sqrt(l[3]);
+   lt02 = l[0] + l[2];
+   lt13 = l[1] + l[3];
+  printf(" FINAL l02 = %lf l0 = %lf l2 = %lf ratios %lf | %lf (EXP %lf  %lf)\n",
+           lt02, l[0], l[2], l[0] / (lt02 * lt02), l[2]/(lt02 * lt02),
+          fact1 * fact1, (1.0 - fact1) * (1.0 - fact1) );
+  printf(" FINAL l13 = %lf l1 = %lf l3 = %lf ratios %lf | %lf (EXP %lf  %lf)\n",
+           lt13, l[1], l[3], l[1] / (lt13 * lt13), l[3]/(lt13 * lt13),
+          fact2 * fact2, (1.0 - fact2) * (1.0 - fact2) );
+  if (fabs (l[0] / lt02 - fact1       )  > EPS08 ||
+      fabs (l[2] / lt02 - (1.0 - fact1)) > EPS08 ||
+      fabs (l[1] / lt13 - fact2       )  > EPS08 ||
+      fabs (l[3] / lt13 - (1.0 - fact2)) > EPS08 ) {
+      printf(" EG_minArc4 Didn't work!!!!! \n");
+      return;
+  }
+#endif
+ uvOUT[0] = uvIT[0];
+ uvOUT[1] = uvIT[1];
+ return;
+}

@@ -58,13 +58,19 @@ int main(int argc, char *argv[])
        colorEdge[2] = colorLine[2];
        break;
     case 3:
-      printf(" YOU HAVE CHOSEN REVERSED ACDL\n ");
-      colorLine[0]  = 255.0/255.0;
-      colorLine[1]  = 255.0/255.0;
-      colorLine[2]  = 255.0/255.0;
-      colorBox[0] = 138.0/255.0;
-      colorBox[1] = 23.0/255.0;
-      colorBox[2] = 50.0/255.0;
+      printf(" HIGHLIGHT EDGE\n ");
+       colorBox[0]  = 255.0/255.0;
+       colorBox[1]  = 255.0/255.0;
+       colorBox[2]  = 255.0/255.0;
+       colorLine[0] = 138.0/255.0;
+       colorLine[1] = 23.0/255.0;
+       colorLine[2] = 50.0/255.0;
+       //colorEdge[0] = 18.0 / 255.0;
+       //colorEdge[1] = 255.0/255.0;
+       //colorEdge[2] = 144.4/255.0;
+       colorEdge[0] = 44.0 / 255.0;
+       colorEdge[1] =  7.0 / 255.0;
+       colorEdge[2] = 16.0 / 255.0;
 
       break;
     case 2:

@@ -52,9 +52,9 @@ typedef struct{
 
 
 typedef struct {
-  int      fID, oriQ, oriV, plotcount, totQ, totV, pp,
-           sizeV, sizeQ, *qIdx, *qAdj, **valence,
-           *vInv, *vType, *remQ, *remV, invsteps, regBd, *degen;
+  int      fID, oriQ, oriV, plotcount, totQ, totV, pp, fin,
+           sizeV, sizeQ, *qIdx, *qAdj, **valence, *vInv,
+           *vType, *remQ, *remV, invsteps, regBd, *degen, bari;
   ego      face;
   double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
   vStar **star;
