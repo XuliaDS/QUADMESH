@@ -3654,6 +3654,130 @@ static int EG_mergeVertices(meshMap *qm, int qC, int centre, int *activity)
   *activity = 0;
   return EGADS_SUCCESS;
 }
+// Find the point P = S(u,v) sth sum (P, Qi) = min
+static void EG_cent(ego face, int n, const double *uvn, double *uvOUT)
+{
+  int    stat, it, nT = 100, i, ii, j;
+  double tol = 1.e-14, L[2], J[4], *pn = NULL, pIT[18], delta[2], x0, x1, x2,
+         nrm1, nrm2, uvIT[2], e1 = -1.0, e2 = -1.0, pv[3], pu[3], puv[3], puu[3], pvv[3], r[3];
+
+  uvIT[0] = uvIT[1] = 0.0;
+  pn      = EG_alloc (n * 18 * sizeof (double));
+  if (pn == NULL) {
+    printf("Null pointer, return \n");
+    return;
+  }
+  for (stat = j = i = 0 ; i < n; i++) {
+    ii = 18 * i;
+   stat += EG_evaluate(face, &uvn[2 * i], &pn[ii]);
+   if ( stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+     printf("point data is wrong\n!");
+#endif
+    }
+    nrm1 = pn[ii + 3] * pn[ii + 3] + pn[ii + 4] * pn[ii + 4] +
+           pn[ii + 5] * pn[ii + 5];
+    nrm2 = pn[ii + 6] * pn[ii + 6] + pn[ii + 7] * pn[ii + 7] +
+           pn[ii + 8] * pn[ii + 8];
+    if (nrm1 < 1.e-14 || nrm2 < 1.e-14) continue;
+    uvIT[0] += uvn[2 * i]; uvIT[1] += uvn[2 * i + 1];
+    j++;
+  }
+  uvIT[0] /= (double)j; uvIT[1] /= (double)j;
+  stat  += EG_evaluate(face, uvIT, pIT);
+  if (stat != EGADS_SUCCESS) {
+#ifdef DEBUG
+printf("SOMETHING WENT PRETTY WRONG... Returning uv average\n");
+#endif
+    uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
+  }
+  for (it = 0; it < nT; it++) {
+#ifdef DEBUG
+      printf(" \n\n qt 3 NEW POINT \n %lf %lf %lf %lf %lf\n",
+      pIT[0], pIT[1], pIT[2], uvIT[0], uvIT[1]);
+        printf(" du  %lf %lf %lf\n dv  %lf %lf %lf\n"
+  " duu %lf %lf %lf\n duv %lf %lf %lf\n"
+  " dvv %lf %lf %lf\n",   pn [3], pIT [4], pIT[5],
+  pIT [6], pIT [7], pIT [8], pIT [9], pIT[10], pIT[11],
+  pIT[12], pIT[13], pIT[14], pIT[15], pIT[16], pIT[17]);
+#endif
+      pu [0] = pIT [3]; pu [1] = pIT [4]; pu [2] = pIT [5];
+      pv [0] = pIT [6]; pv [1] = pIT [7]; pv [2] = pIT [8];
+      puu[0] = pIT [9]; puu[1] = pIT[10]; puu[2] = pIT[11];
+      puv[0] = pIT[12]; puv[1] = pIT[13]; puv[2] = pIT[14];
+      pvv[0] = pIT[15]; pvv[1] = pIT[16]; pvv[2] = pIT[17];
+      L[0] = L[1] = 0.0;
+      J[0] = J[1] = J[2] = J[3] = 0.0;
+      for (i = 0; i < n; i++) {
+        ii   = 18 * i;
+        r[0] = pIT[0] - pn[ii    ];
+        r[1] = pIT[1] - pn[ii + 1];
+        r[2] = pIT[2] - pn[ii + 2];
+        L[0] += DOT(pu ,r); L[1] += DOT(pv ,r);
+        J[0] += DOT(puu,r); J[1] += DOT(puv,r);
+        J[3] += DOT(pvv,r);
+      }
+      J[0] += (double)n * DOT(pu, pu);
+      J[1] += (double)n * DOT(pu, pv);
+      J[3] += (double)n * DOT(pv, pv);
+      J[2]  = J[1];
+      nrm1  = J[0] * J[3] - J[1] * J[2];
+ #ifdef DEBUG
+      printf(" JACOBIAN MATRIX 2 x 2 DET %1.2e\n", nrm1);
+      printf(" %lf %lf \n",J[0], J[1]);
+      printf(" %lf %lf \n",J[2], J[3]);
+      printf(" ----------------------\n");
+ #endif
+      if (fabs(nrm1) < 1.e-10) {
+          printf(" IT %d DETERMINANT SIZE %lf  \n", it, nrm1);
+          break;
+      }
+      nrm1      =   1.0 / nrm1;
+      delta[0]  = -nrm1 * ( J[3] * L[0] - J[1] * L[1]);
+      delta[1]  = -nrm1 * (-J[2] * L[0] + J[0] * L[1]);
+      uvIT [0] += delta[0];
+      uvIT [1] += delta[1];
+      x2        = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+      if      (it == 0) x0 = x2;
+      else if (it == 1) x1 = x2;
+      else {
+          e1 = fabs(x1 / x0);
+          e2 = fabs(x2 / x1);
+          x0 = x1;
+          x1 = x2;
+      }
+      stat = EG_evaluate(face, uvIT, pIT);
+      if (stat != EGADS_SUCCESS || x2 < tol ) {
+#ifdef DEBUG
+          printf("EG_evaluate %d  DELTA SIZE %1.2e < %1.2e \n",
+          stat, x2, tol);
+#endif
+          break;
+      }
+#ifdef DEBUG
+      printf(" Xn = (%lf %lf) Fn = (%lf %lf) Deltan(%lf %lf) size  %1.2e < %1.2e\n",
+      uvn[0], uvn[1], L[0], L[1], delta[0], delta[1], x2, tol );
+#endif
+  }
+  uvOUT[0] = uvIT[0];
+  uvOUT[1] = uvIT[1];
+#ifdef DEBUG
+  printf(" --------------------------------------------------- \n");
+  if (e1 > 0.0 && e2 > 0.0) printf("IT %d CONVERGENCE %lf \n", it, log(e2) / log(e1));
+#endif
+   for ( i = 0 ; i < n; i++) {
+     ii    = 18 * i;
+     r[0]  = pIT[0] - pn[ii    ];
+     r[1]  = pIT[1] - pn[ii + 1];
+     r[2]  = pIT[2] - pn[ii + 2];
+#ifdef DEBUG
+  printf(" P - Q(%d) = %lf\n", i + 1, sqrt (DOT(r,r)));
+#endif
+  }
+  EG_free(pn);
+  return;
+}
+
 
 
 static int EG_swap(meshMap *qm, int qIn, int *activity)
