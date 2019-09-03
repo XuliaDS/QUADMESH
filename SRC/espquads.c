@@ -1008,334 +1008,6 @@ printf(" %lf %lf %lf C\n", pIT[0], pIT[1], pIT[2]);
 }
 
 
-#define  FACE_NORMAL_FOLD_CHECK
-
-void
-EG_eqOpAre(meshMap *qm, int vID, double *uvOUT)
-{
-  int    nq, nv, nS = 20, stat, k, j, i, i3, j3, it, nT = 100, flag =0, fold = 0, periodic;
-  double delta[3] = {0.0, 0.0, 0.0}, L[3] = {0.0, 0.0, 0.0}, range[4],
-         pIT[18], J[9], JI[9], *sp = NULL, *pn = NULL, *Opn = NULL, crIT[3], uv[3],
-         *cr = NULL, *p21 = NULL, area, a1, detJ, x1 = 0.0, x2 = 0.0, alpha,
-          e1 = 0.0, e2 = 0.0, x0 = 0.0, v[3], u[3], uvIT[3], nrm1, nrm2, s,
-          rsdnrm = 0.0, x3 = 0.0, delnrm = 1.0, tol = 1.e-10, *ft = NULL;
-#ifdef FACE_NORMAL_FOLD_CHECK
-  int    mtype;
-#endif
-  nq  = qm->star[vID -1]->nQ;
-  nv  = qm->star[vID -1]->nV - 1;
-  sp  = EG_alloc(3 * (nv + 1) * sizeof(double));
-  pn  = EG_alloc(3 * (nq + 1) * sizeof(double));
-  if (sp == NULL || pn == NULL) return;
-  uvIT[0] = uvIT[1] = uvIT[2] = 0.0;
-  for (stat = k = j = i = 0; i < nv; i++) {
-    j3     = qm->star[vID -1]->verts[i + 1] - 1;
-    stat  += EG_evaluate(qm->face, &qm->uvs[2 * j3], pIT);
-    i3     = 3 * i;
-    sp[i3] = pIT[0]; sp[i3 + 1] = pIT[1]; sp[i3 + 2] = pIT[2];
-    nrm1   = DOT3(&pIT[3], &pIT[3]);
-    nrm2   = DOT3(&pIT[6], &pIT[6]);
-    if (i % 2 == 0) {
-      pn[3 * k    ] = sp[i3];
-      pn[3 * k + 1] = sp[i3 + 1];
-      pn[3 * k + 2] = sp[i3 + 2]; k++;
-    }
-    if (nrm1 < 1.e-14 || nrm2 < 1.e-14) continue;
-    uvIT[0] += qm->uvs[2 * j3    ];
-    uvIT[1] += qm->uvs[2 * j3 + 1];
-    j++;
-  }
-  pn[nq * 3] = pn[0]; pn[nq * 3 + 1] = pn[1]; pn[nq * 3 + 2] = pn[2];
-  sp[nv * 3] = sp[0]; sp[nv * 3 + 1] = sp[1]; sp[nv * 3 + 2] = sp[2];
-  for (i = 0; i <= nv; i++) printf("%lf %lf %lf %d\n",
-   sp[3 * i], sp[3 * i + 1], sp[3 * i + 2], i + 1);
-   for (i = 0; i <= nq; i++) printf("%lf %lf %lf %d\n",
-    pn[3 * i], pn[3 * i + 1], pn[3 * i + 2], i + 1);
-  uvIT[0]  /= (double)j; uvIT[1] /= (double)j;
-  stat     += EG_evaluate(qm->face, uvIT, pIT);
-  printf(" UV0 %lf %lf %lf %lf %lf\n", uvIT[0], uvIT[1], pIT[0], pIT[1], pIT[2]);
-    if (stat != EGADS_SUCCESS) {
-#ifdef DEBUG
-  printf("SOMETHING WENT PRETTY WRONG... Returning uv average\n");
-#endif
-    uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
-    EG_free(pn); EG_free(sp);
-    return;
-  }
-  Opn = EG_alloc(3 * (nq + 1) * sizeof(double));
-  cr  = EG_alloc(3 *  nq      * sizeof(double));
-  p21 = EG_alloc(3 * (nq + 1) * sizeof(double));
-  ft  = EG_alloc(     nq      * sizeof(double));
-  for (i = 0 ; i < nq; i++) {
-      i3 = 3  *  2 *  i;
-      j3 = 3  * (2 *  i + 1);
-      VEC(&sp[i3], &sp[j3], u);
-      printf(" v1 %d %lf %lf %lf con %d %lf %lf %lf\n",
-       2 *  i,      sp[i3], sp[i3 + 1], sp[i3 + 2],
-       2 * (i + 1), sp[j3], sp[j3 + 1], sp[j3 + 2]);
-      j3 = 3  * (2 *  i + 2);
-      VEC(&sp[i3], &sp[j3], v);
-      printf(" v2 %d %lf %lf %lf con %d %lf %lf %lf\n",
-       2 *  i,      sp[i3], sp[i3 + 1], sp[i3 + 2],
-       2 * (i + 2), sp[j3], sp[j3 + 1], sp[j3 + 2]);
-      CRXSS(u, v, cr);
-      ft[i] = sqrt(DOT3(cr, cr));
-      printf("FT %d = %lf CROSSING %d %d x %d %d\n",
-              i, ft[i], 2 * i, 2 * (i + 1),
-                        2 * i, 2 * (i + 2));
-      VEC(pIT, &pn[3 * i], &Opn[3 * i]);
-  }
-  Opn[3 * nq    ] = Opn[0];
-  Opn[3 * nq + 1] = Opn[1];
-  Opn[3 * nq + 2] = Opn[2];
-  #ifdef DEBUG
-  area = 0.0;
-  printf(" --------- INITIAL GUESS ----------- \n");
-   for (i  = 0 ; i < nq; i++) {
-    i3     = 3  *  i;
-    j3     = 3  * (i + 1);
-    CRXSS(&Opn[i3], &Opn[j3],  &cr[i3]);
-    VEC  ( &pn[j3],  &pn[i3], &p21[i3]);
-    a1    = sqrt(DOT3(&cr[i3], &cr[i3]));
-    area += a1 + ft[i];
-  }
-  for (i = 0 ; i < nq; i++) {
-      i3 = 3 * i;
-      a1 = sqrt(DOT3(&cr[i3], &cr[i3]));
-      printf("A[%d] = %lf (OPP %lf ) TOT %lf \n", i + 1,a1, ft[i], area);
-  }
-#endif
-
-#ifdef FACE_NORMAL_FOLD_CHECK
-  /* get mtype=SFORWARD or mtype=SREVERSE for the face to get topology normal */
-  mtype = qm->face->mtype;
-#else
-  /* use the original triangle normal as the reference */
-  crIT[0] = cr[0];
-  crIT[1] = cr[1];
-  crIT[2] = cr[2];
-#endif
-  for (it = 0; it < nT; it++) {
-    s     = 1.0;
-    for (j = 0; j < nS; j++) {
-      uv[0] = uvIT[0] - s*delta[0];
-      uv[1] = uvIT[1] - s*delta[1];
-      uv[2] = uvIT[2] - s*delta[2];
-      printf("\n\n%lf %lf %lf C\n", pIT[0], pIT[1], pIT[2]);
-      stat = EG_evaluate(qm->face, uv, pIT);
-      printf("\n\n%lf %lf %lf C\n", pIT[0], pIT[1], pIT[2]);
-      if (stat != EGADS_SUCCESS) {
-        printf(" EG_baryInsert: EG_evaluate = %d\n", stat);
-        s /= 2.0;
-        continue;
-      }
-#ifdef FACE_NORMAL_FOLD_CHECK
-/* get the normal vector at the proposed point */
-      CRXSS(&pIT[3], &pIT[6], crIT);
-      crIT[0] *= mtype;
-      crIT[1] *= mtype;
-      crIT[2] *= mtype;
-      printf(" NORMAL PLANE %lf %lf %lf\n", crIT[0], crIT[1], crIT[2]);
-#endif
-      for (i = 0 ; i <= nq; i++)
-        VEC(pIT, &pn[3 * i], &Opn[3 * i]);
-      for (flag = i = 0 ; i < nq; i++) {
-        CRXSS(&Opn[3 * i], &Opn[3 * (i + 1)], &cr[3 * i]);
-        if (DOT3(&cr[3 * i], crIT) < 0.0) {
-            printf("!!!!!!!!!! i %d DOT %lf ACTIVATE FLAG \n",
-            i, DOT3(&cr[3 * i], crIT));
-           flag = 1;
-         }
-      }
-      if (flag == 1 && it > 0) {
-        s /= 2.0;
-        continue;
-      } else if (it == 0 && flag == 1) {
-           if (fold == 1) {
-             printf(" FOLD = %d niente a fare\n", fold);
-             return ;
-           } else {
-             pIT[0] = pIT[1] = pIT[2] = 0.0;
-             for (i = 0 ; i < nq; i++) {
-               i3     = 3 * i;
-               pIT[0] += pn[i3    ];
-               pIT[1] += pn[i3 + 1];
-               pIT[2] += pn[i3 + 2];
-             }
-             pIT[0] /= (double)nq;
-             pIT[1] /= (double)nq;
-             pIT[2] /= (double)nq;
-             stat = EG_invEvaluateGuess(qm->face, pIT, uvIT, J);
-             /* check for success and in range */
-             EG_getRange(qm->face, range, &periodic);
-             if ((stat != EGADS_SUCCESS) ||
-                    (uvIT[0] < range[0]) || (uvIT[0] > range[1]) ||
-                    (uvIT[1] < range[2]) || (uvIT[1] > range[3])) {
-                      if (stat != EGADS_SUCCESS)
-                           printf(" EG_baryInsert: EG_invEvaluateGuess = %d\n", stat);
-                      else printf(" EG_baryInsert: EG_invEvaluateGuess out of range!\n");
-                     /* one last hope for a better initial guess */
-                     stat = EG_invEvaluate(qm->face, pIT, uvIT, J);
-                     if (stat != EGADS_SUCCESS) {
-                       printf(" EG_baryInsert: EG_invEvaluate = %d\n", stat);
-                       return ;
-                     }
-             }
-             fold = 1;
-             continue; /* try again */
-         }
-    }
-    for (i  = 0 ; i < nq; i++)
-      VEC(pIT, &pn[3 * i], &Opn[3 * i]);
-    alpha = 1.0 + uv[2];
-    L[0] = L[1] = L[2] = 0.0;
-    L[0] = L[1] = L[2] = 0.0;
-    for (i = 0 ; i < nq; i++) {
-       i3  = 3  *  i;
-       j3  = 3  * (i + 1);
-       CRXSS(&pIT[3],  &p21[i3], u);
-       CRXSS(&pIT[6],  &p21[i3], v);
-       CRXSS(&Opn[i3], &Opn[j3], &cr[i3]);
-      L[0] += alpha * DOT3(u,&cr[i3]);
-      L[1] += alpha * DOT3(v,&cr[i3]);
-      L[2] +=         DOT3(&cr[i3],&cr[i3]) - ft[i];
-    }
-    L[2] *= 0.5;
-    rsdnrm  = sqrt(DOT(L, L));
-    printf(" L %lf %lf %lf RSDNRM %lf < %lf ?\n", L[0], L[1], L[2], rsdnrm, x3);
-    if (it > 0) break;
-    if (it == 0 || rsdnrm < x3) {
-      x3 = rsdnrm; /* save off the last resdual and exit */
-      break;
-    } else {
-      s /= 2.0; /* try again if the residual grew */
-      continue;
-      }
-  }
-  printf(" LINE SEARCH IT %d SEARCHES %d\n", it, j);
-  if (j == nS) printf(" EG_minArea LINE SEARCH FAIL!!!\n");
-  uvIT[0] = uv[0];
-  uvIT[1] = uv[1];
-  uvIT[2] = uv[2];
-  printf(" UPDATE UV !!!!\n");
-  if (j      == nS) break;  /* line search failed */
-  if (rsdnrm < tol) {
-    printf(" %lf < %lf\n", rsdnrm, tol);
-    break;  /* converged! */
-  }
-  J[0]  = J[1] = J[2] = 0.0;
-  J[3]  = J[4] = J[5] = 0.0;
-  alpha = 1.0 + uvIT[2];
-  for (i  = 0 ; i < nq; i++) {
-    i3    = 3  *  i;
-    CRXSS(&pIT[3], &p21[i3], u);
-    CRXSS(&pIT[6], &p21[i3], v);
-    J[2] += DOT3(u,&cr[i3]);
-    J[5] += DOT3(v,&cr[i3]);
-    J[0] += alpha * DOT (u,u);
-    J[1] += alpha * DOT (u,v);
-    J[4] += alpha * DOT (v,v);
-    // uu
-    CRXSS(&pIT[9], &p21[i3], v);
-    J[0] += alpha * DOT3(v,&cr[i3]);
-    // uv
-    CRXSS(&pIT[12], &p21[i3], v);
-    J[1] += alpha * DOT3(v,&cr[i3]);
-    //vv
-    CRXSS(&pIT[15], &p21[i3], v);
-    J[4] += alpha * DOT3(v,&cr[i3]);
-   }
-   J[3] = J[1]; J[6] = J[2];
-   J[7] = J[5]; J[8] = 0.0;
-   detJ = J[1] * J[5] * J[6] + J[2] * J[7] * J[3] -
-          J[2] * J[4] * J[6] - J[5] * J[7] * J[0];
-          printf("\n JACOBIAN MATRIX \n");
-          printf("----------------------------\n");
-          printf(" %lf  %lf  %lf  \n", J[0], J[1], J[2]);
-          printf(" %lf  %lf  %lf  \n", J[3], J[4], J[5]);
-          printf(" %lf  %lf  %lf  \n", J[6], J[7], J[8]);
-          printf("----------------------------\n");
-   if (fabs(detJ) < 1.e-13) {
-    printf(" DETERMINANT TOOO SMALL %.16e \n", detJ);
-     break;
-   }
-   detJ = 1.0 / detJ;
-
-   JI[0] =  -J[7] * J[5];
-   JI[1] =   J[7] * J[2];
-   JI[2] =   J[1] * J[5] - J[4] * J[2];
-   JI[3] =   J[6] * J[5];
-   JI[4] =  -J[6] * J[2];
-   JI[5] = -(J[0] * J[5] - J[3] * J[2]);
-   JI[6] =   J[3] * J[7] - J[6] * J[4];
-   JI[7] = -(J[0] * J[7] - J[6] * J[1]);
-   JI[8] =   J[0] * J[4] - J[3] * J[1];
-
-   printf("%lf  %lf  %lf \n", detJ * (J[0] * JI[0] + J[1] * JI[3] + J[2] * JI[6]),
-                              detJ * (J[0] * JI[1] + J[1] * JI[4] + J[2] * JI[7]),
-                              detJ * (J[0] * JI[2] + J[1] * JI[5] + J[2] * JI[8]));
-     printf("%lf  %lf  %lf \n", detJ * (J[3] * JI[0] + J[4] * JI[3] + J[5] * JI[6]),
-                                detJ * (J[3] * JI[1] + J[4] * JI[4] + J[5] * JI[7]),
-                                detJ * (J[3] * JI[2] + J[4] * JI[5] + J[5] * JI[8]));
-     printf("%lf  %lf  %lf \n", detJ * (J[6] * JI[0] + J[7] * JI[3] + J[8] * JI[6]),
-                                detJ * (J[6] * JI[1] + J[7] * JI[4] + J[8] * JI[7]),
-                                detJ * (J[6] * JI[2] + J[7] * JI[5] + J[8] * JI[8]));
-
-     delta[0] = detJ * DOT3( JI   , L);
-     delta[1] = detJ * DOT3(&JI[3], L);
-     delta[2] = detJ * DOT3(&JI[6], L);
-     delnrm  = sqrt(DOT(delta, delta));
-     if      (it == 0) x0 = delnrm;
-     else if (it == 1) x1 = delnrm;
-     else {
-         e1 = fabs(x1 / x0);
-         e2 = fabs(delnrm / x1);
-         x0 = x1;
-         x1 = delnrm;
-     }
-     printf(" Xn = (%lf %lf %lf )\n", uvIT[0], uvIT[1], uvIT[2]);
-     printf(" L = %lf %lf %lf DELTA %lf %lf %lf SIZE  %1.8le < %1.8le\n",
-            L[0], L[1], L[2], delta[0], delta[1], delta[2], delnrm, tol);
-
-   if (delnrm < tol) break;
-    /* update the solution */
-    /* check for convergence on the parameter update */
-  }
-  if (rsdnrm >= tol && delnrm >= tol) {
-    printf(" EG_baryInsert: not converged -- residual %1.2le delta %1.2le (%1.2le)\n", rsdnrm, delnrm, tol);
-  }
-  #ifdef DEBUG
-  for (i = 0 ; i <= nq; i++)
-    VEC(pIT, &pn[3 * i], &Opn[3 * i]);
-  printf(" --------- FINAL GUESS ----------- \n");
-  printf("IT %d DELTA SIZE %1.2e < %1.2e n", it, x2, tol);
-  if (e1 > tol && e2 > tol)
-      printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
-  area = 0.0;
-  for (i = 0 ; i < nq; i++) {
-      i3          = 3  *  i;
-      CRXSS (&Opn[i3], &Opn[3 * (i + 1)], &cr[i3]);
-      printf(" V%d CROSS %lf %lf %lf\n", i + 1, cr[i3], cr[i3 + 1], cr[i3 + 2]);
-      a1          = sqrt(DOT3(&cr[i3], &cr[i3]));
-      area       += a1 + ft[i];
-    }
-    for (i = 0 ; i < nq; i++) {
-        i3 = 3 * i;
-        a1 = sqrt(DOT3(&cr[i3], &cr[i3]));
-        printf("area %lf OP %lf (TOT %lf)\n",a1,ft[i], area);
-    }
-  #endif
-  EG_free(pn); EG_free(Opn); EG_free(cr); EG_free(p21);
-  uvOUT[0] = uvIT[0];
-  uvOUT[1] = uvIT[1];
-}
-
-
-
-
-
-
-
 
 #define  FACE_NORMAL_FOLD_CHECK
 void
@@ -1447,7 +1119,7 @@ for (i = 0 ; i <= n; i++) {
 }
 uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
 area = 0.0;
-printf(" --------- EQAREA INITIAL GUESS ----------- \n");
+printf(" --------- IT %d ----------- \n", it);
 for (i = 0 ; i < n; i++) {
  i3          = 3  *  i;
  j3          = 3  * (i + 1);
@@ -1533,7 +1205,7 @@ for (i = 0 ; i < n; i++) {
     L[2] *= 0.5;
     rsdnrm  = sqrt(DOT(L, L));
     printf(" L %lf %lf %lf RSDNRM %lf < %lf ?\n", L[0], L[1], L[2], rsdnrm, x3);
-    if (it > 0) break;
+    //if (it > 0) break;
     if (it == 0 || rsdnrm < x3) {
       x3 = rsdnrm; /* save off the last resdual and exit */
       break;
@@ -2225,21 +1897,6 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
    l    = EG_alloc(2 * n * sizeof(double));
    if (pn == NULL ) return;
    uvIT[0] = uvIT[1] = 0.0;
-   /*if (n == 4){
-   pn[0] = 0.15 ; pn[1]  = 0.0; pn[2] = 0.0;
-   pn[3] = 1.0;  pn[4]  = 0.5;  pn[5] = 0.0;
-   pn[6] = 0.85 ; pn[7]  = 1.0; pn[8] = 0.0;
-   pn[9] = 0.0 ; pn[10] = 0.5;  pn[11] = 0.0;
-   EG_invEvaluate(face,pn, uvn, J);
-   EG_invEvaluate(face,&pn[3], &uvn[2], J);
-   EG_invEvaluate(face,&pn[6], &uvn[4], J);
-   EG_invEvaluate(face,&pn[9], &uvn[6], J);
-   printf("%lf %lf %lf 0\n", pn[0], pn[1 ], pn[2]);
-   printf("%lf %lf %lf 1\n", pn[3], pn[4 ], pn[5]);
-   printf("%lf %lf %lf 2\n", pn[6], pn[7 ], pn[8]);
-   printf("%lf %lf %lf 3\n", pn[9], pn[10], pn[11]);
-   printf("%lf %lf %lf 4\n", pn[0], pn[1 ], pn[2]);
- }*/
    for (stat = j = i = 0 ; i < n; i++) {
      stat += EG_evaluate(face, &uvn[2 * i], pIT);
      if ( stat != EGADS_SUCCESS) {
@@ -2257,9 +1914,7 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
      j++;
   }
   uvIT[0] /= (double)j; uvIT[1] /= (double)j;
-//  uvIT[0] = 0.75 * uvIT[0] + uvn[0] * 0.25;
-//  uvIT[1] = 0.75 * uvIT[1] + uvn[1] * 0.25;
-  stat     += EG_evaluate(face, uvIT, pIT);
+  stat    += EG_evaluate(face, uvIT, pIT);
   uvOUT[0] = uvIT[0]; uvOUT[1] = uvIT[1];
   if (stat != EGADS_SUCCESS) {
   #ifdef DEBUG2
@@ -2269,16 +1924,15 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
   }
  #ifdef DEBUG2
    lt = 0.0;
-   for (i = 0 ; i < n; i++) printf("%lf %lf %lf \n", pn[3 * i], pn[3 * i + 1], pn[3 * i + 2]);
+   for (i = 0 ; i < n; i++) {
+     printf("%lf %lf %lf \n", pIT[0], pIT[1], pIT[2]);
+     printf("%lf %lf %lf \n\n\n", pn[3 * i], pn[3 * i + 1], pn[3 * i + 2]);
+   }
    if ( n == 4) {
      VEC(pn, &pn[6], r);
      ltar  = DOT(r,r);
      VEC(&pn[3], &pn[9], r);
      ltar += DOT(r,r);
-     printf("%lf %lf %lf 0 \n", pn[0], pn[1], pn[2]);
-     printf("%lf %lf %lf 2 \n\n\n", pn[6], pn[7], pn[8]);
-     printf("%lf %lf %lf 1 \n", pn[3], pn[4], pn[5]);
-     printf("%lf %lf %lf 3 \n\n\n", pn[9], pn[10], pn[11]);
    }
    printf(" --------- MIN ARC INITIAL GUESS ----------- \n");
    lt = 0.0;
@@ -2399,250 +2053,56 @@ static double EG_quadSize(meshMap *qm, int qID, /*@null@*/ double *tris)
     printf(" EG_minArc: not converged -- residual %1.2le delta %1.2le (%1.2le)\n", rsdnrm, delnrm, tol);
   }
   #ifdef DEBUG2
-  printf(" --------- FINAL GUESS ----------- \n");
+  for (i = 0 ; i < n; i++) {
+    printf("%lf %lf %lf \n", pIT[0], pIT[1], pIT[2]);
+    printf("%lf %lf %lf \n\n\n", pn[3 * i], pn[3 * i + 1], pn[3 * i + 2]);
+  }
+  printf(" --------- MIN ARC 4 FINAL GUESS ----------- \n");
   printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
   if (e1 > tol && e2 > tol) printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
-      lt = 0.0;
-      for (i = 0 ; i < n; i++) {
-        VEC(pIT, &pn[3 * i], r);
-        lt += DOT(r,r);
-      }
-      for (i = 0 ; i < n; i++) {
-        VEC(pIT, &pn[3 * i], r);
-        li = DOT(r,r);
-        printf(" LENGTH %lf TOTAL %lf \n", li, lt);
-      }
+  lt = 0.0;
+  for (i = 0 ; i < n; i++) {
+    VEC(pIT, &pn[3 * i], r);
+    lt += sqrt(DOT(r,r));
+  }
+  for (i = 0 ; i < n; i++) {
+    VEC(pIT, &pn[3 * i], r);
+    li = sqrt(DOT(r,r));
+    printf(" LENGTH %lf TOTAL %lf \n", li, lt);
+  }
    #endif
   EG_free(pn); EG_free(opn);
   uvOUT[0] = uvIT[0];
   uvOUT[1] = uvIT[1];
-  //if ( n == 4) exit(1);
+  if ( it > 20) fprintf(stderr," EG MIN ARC 4 %d ITERS!!!\n", it);//if ( n == 4) exit(1);
   }
-
-  static void EG_geo4 (ego face,  double *uvn, double *uvOUT)
-  {
-    int    nS = 20, stat, j, i, it, nT = 100, flag =0, fold = 0, periodic;
-    double delta[2] = {0.0, 0.0}, L[2] = {0.0, 0.0}, range[4],
-           pIT[18], J[4], pn[3 * 4], op0[3], op1[3], op2[3], op3[3], l02, l13,l0, l1, l2,l3,
-           detJ, x1 = 0.0, x2 = 0.0, e1 = 0.0, e2 = 0.0, x0 = 0.0, u[3], v[3], uvm[2],
-           uvIT[2], nrm1, nrm2, s, rsdnrm = 0.0, x3 = 0.0, delnrm = 1.0, tol = 1.e-10;
-
-    uvIT[0] = uvIT[1] = 0.0;
-    pn[0] = 0.5 ; pn[1]  = 0.0; pn[2] = 0.0;
-    pn[3] = 1.0;  pn[4]  = 0.5;  pn[5] = 0.0;
-    pn[6] = 0.5 ; pn[7]  = 1.0; pn[8] = 0.0;
-    pn[9] = 0.0 ; pn[10] = 0.5;  pn[11] = 0.0;
-    EG_invEvaluate(face,pn, uvn, J);
-    EG_invEvaluate(face,&pn[3], &uvn[2], J);
-    EG_invEvaluate(face,&pn[6], &uvn[4], J);
-    EG_invEvaluate(face,&pn[9], &uvn[6], J);
-    printf("%lf %lf %lf 0\n", pn[0], pn[1 ], pn[2]);
-    printf("%lf %lf %lf 1\n", pn[3], pn[4 ], pn[5]);
-    printf("%lf %lf %lf 2\n", pn[6], pn[7 ], pn[8]);
-    printf("%lf %lf %lf 3\n", pn[9], pn[10], pn[11]);
-    printf("%lf %lf %lf 4\n", pn[0], pn[1 ], pn[2]);
-
-    for (stat = j = i = 0 ; i < 4; i++) {
-      stat += EG_evaluate(face, &uvn[2 * i], pIT);
-      if ( stat != EGADS_SUCCESS) {
-   #ifdef DEBUG2
-    fprintf(stderr, "point data is wrong\n!");
-   #endif
-      }
-
-      pn[3 * i    ] = pIT[0];
-      pn[3 * i + 1] = pIT[1];
-      pn[3 * i + 2] = pIT[2];
-      nrm1   = DOT3(&pIT[3], &pIT[3]);
-      nrm2   = DOT3(&pIT[6], &pIT[6]);
-      if (nrm1 < 1.e-14 || nrm2 < 1.e-14) continue;
-      printf("%lf %lf %lf %d\n",pIT[0], pIT[1], pIT[2], i + 1);
-      uvIT[0] += uvn[2 * i]; uvIT[1] += uvn[2 * i + 1];
-      j++;
-   }
-   printf("%lf %lf %lf %d\n",pn[0], pn[1], pn[2], i + 1);
-   uvIT[0] = 0.25 * uvn[0] + 0.75 * uvn[2];
-   uvIT[1] = 0.25 * uvn[1] + 0.75 * uvn[3];
-   //uvIT[0]  /= (double)j; uvIT[1] /= (double)j;
-   stat     += EG_evaluate(face, uvIT, pIT);
-   uvOUT[0]  = uvIT[0]; uvOUT[1] = uvIT[1];
-   if (stat != EGADS_SUCCESS) {
-   #ifdef DEBUG2
-   printf("SOMETHING WENT PRETTY WRONG... Returning uv average\n");
-   #endif
-     return;
-   }
-    EG_getSidepoint(face, 0.5, uvn, &uvn[4], NULL, NULL, uvm);
-    EG_evaluate(face, uvm, pIT);
-    VEC( pn   , pIT, op0);
-    l02  = sqrt (DOT(op0,op0));
-    VEC( &pn[6]   , pIT, op0);
-    l02 += sqrt (DOT(op0,op0));
-
-    EG_getSidepoint(face, 0.5, &uvn[2], &uvn[6], NULL, NULL,  uvm);
-    EG_evaluate(face, uvm, pIT);
-    VEC( &pn[3]   , pIT, op0);
-    l13  = sqrt (DOT(op0,op0));
-    VEC( &pn[9]   , pIT, op0);
-    l13 += sqrt (DOT(op0,op0));
-   stat += EG_evaluate(face, uvIT, pIT);
-  #ifdef DEBUG2
-    op0[0] = pIT[0] - pn[0];
-    op0[1] = pIT[1] - pn[1];
-    op0[2] = pIT[2] - pn[2];
-
-    op1[0] = pIT[0] - pn[3];
-    op1[1] = pIT[1] - pn[4];
-    op1[2] = pIT[2] - pn[5];
-
-    op2[0] = pIT[0] - pn[6];
-    op2[1] = pIT[1] - pn[7];
-    op2[2] = pIT[2] - pn[8];
-
-    op3[0] = pIT[0] - pn[9];
-    op3[1] = pIT[1] - pn[10];
-    op3[2] = pIT[2] - pn[11];
-    l0  = sqrt (DOT (op0, op0));
-    l1  = sqrt (DOT (op1, op1));
-    l2  = sqrt (DOT (op2, op2));
-    l3  = sqrt (DOT (op3, op3));
-    printf(" --------- INITIAL GUESS ----------- \n");
-    printf(" l0 = %lf l2 = %lf ---> %lf = %1.2le \n", l0, l2, l0 + l2, l02);
-    printf(" l0 = %lf l2 = %lf ---> %lf = %1.2le \n", l1, l3, l1 + l3, l13);
-  #endif
-
-   for (it = 0; it < nT; it++) {
-     printf("%lf %lf %lf C\n", pIT[0], pIT[1], pIT[2]);
-     op0[0] = pIT[0] - pn[0];
-     op0[1] = pIT[1] - pn[1];
-     op0[2] = pIT[2] - pn[2];
-     l0     = sqrt (DOT (op0, op0));
-
-     op1[0] = pIT[0] - pn[3];
-     op1[1] = pIT[1] - pn[4];
-     op1[2] = pIT[2] - pn[5];
-     l1     = sqrt (DOT (op1, op1));
-
-     op2[0] = (pIT[0] - pn[6]);
-     op2[1] = (pIT[1] - pn[7]);
-     op2[2] = (pIT[2] - pn[8]);
-     l2     = sqrt (DOT (op2, op2));
-
-     op3[0] = (pIT[0] - pn[9]);
-     op3[1] = (pIT[1] - pn[10]);
-     op3[2] = (pIT[2] - pn[11]);
-     l3     = sqrt (DOT (op3, op3));
-
-     L[0]   = fabs(l0 + l2 - l02);// * (l0 + l2 - l02);
-     L[1]   = fabs(l1 + l3 - l13);// * (l1 + l3 - l13);
-
-     u[0] = pIT[3]; u[1] = pIT[4]; u[2] = pIT[5];
-     v[0] = pIT[6]; v[1] = pIT[7]; v[2] = pIT[8];
-
-     J[0] = DOT(u, op0) / l0 + DOT(u, op2) / l2;
-     //J[0] *= 2.0 * (l0 + l2 - l02);
-     J[1] = DOT(v, op0) / l0 + DOT(v, op2) / l2;
-     //J[1] *= 2.0 * (l0 + l2 - l02);
-     J[2] = DOT(u, op1) / l1 + DOT(u, op3) / l3;
-     //J[2] *= 2.0 * (l1 + l3 - l13);
-     J[3] = DOT(v, op1) / l1 + DOT(v, op3) / l3;
-     //J[3] *= 2.0 * (l1 + l3 - l13);
-    detJ  = J[0] * J[3] - J[1] * J[2];
-  #ifdef DEBUG2
-   printf(" JACOBIAN MATRIX 2 x 2 DET %1.2e\n", detJ);
-   printf(" %1.2le %1.2le \n",J[2], J[3]);
-   printf(" %1.2le %1.2le \n",J[0], J[1]);
-   printf(" ----------------------\n");
-  #endif
-  if ( detJ < 1.e-12) {
-    printf(" DET TOO SMALL. BREAK\n");
-    break;
-  }
-   detJ     = 1.0 / detJ;
-   delta[0] = detJ * ( J[3] * L[0] - J[1] * L[1]);
-   delta[1] = detJ * (-J[2] * L[0] + J[0] * L[1]);
-   delnrm   = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
-   uvIT[0] -= delta[0];
-   uvIT[1] -= delta[1];
-   stat = EG_evaluate(face, uvIT, pIT);
-   if      (it == 0) x0 = delnrm;
-   else if (it == 1) x1 = delnrm;
-   else {
-          e1 = fabs(x1 / x0);
-          e2 = fabs(delnrm / x1);
-          x0 = x1;
-          x1 = delnrm;
-   }
-  #ifdef DEBUG2
-   printf(" Xn = (%lf %lf )\n", uvIT[0], uvIT[1]);
-   printf(" L = %1.2le %1.2le DELTA %1.2le  %1.2le SIZE %1.2le < %1.2le\n",
-             L[0], L[1],delta[0], delta[1],delnrm, tol);
-  #endif
-    if (delnrm < 1.e-14) break;
-     /* update the solution */
-     /* check for convergence on the parameter update */
-   }
-   if (rsdnrm >= tol && delnrm >= tol) {
-     printf(" EG_minArc: not converged -- residual %1.2le delta %1.2le (%1.2le)\n", rsdnrm, delnrm, tol);
-   }
-   #ifdef DEBUG2
-   printf(" --------- GEO FINAL GUESS ----------- \n");
-   printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
-   if (e1 > tol && e2 > tol) {
-    printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
-  }
-  op0[0] = pIT[0] - pn[0];
-  op0[1] = pIT[1] - pn[1];
-  op0[2] = pIT[2] - pn[2];
-
-  op1[0] = pIT[0] - pn[3];
-  op1[1] = pIT[1] - pn[4];
-  op1[2] = pIT[2] - pn[5];
-
-  op2[0] = pIT[0] - pn[6];
-  op2[1] = pIT[1] - pn[7];
-  op2[2] = pIT[2] - pn[8];
-
-  op3[0] = pIT[0] - pn[9];
-  op3[1] = pIT[1] - pn[10];
-  op3[2] = pIT[2] - pn[11];
-  l0  = sqrt (DOT (op0, op0));
-  l1  = sqrt (DOT (op1, op1));
-  l2  = sqrt (DOT (op2, op2));
-  l3  = sqrt (DOT (op3, op3));
-  printf(" --------- GEO FINAL ----------- \n");
-  printf(" l0 = %lf l2 = %lf ---> %lf = %1.2le \n", l0, l2, l0 + l2, l02);
-  printf(" l0 = %lf l2 = %lf ---> %lf = %1.2le \n", l1, l3, l1 + l3, l13);
-    #endif
-   uvOUT[0] = uvIT[0];
-   uvOUT[1] = uvIT[1];
-   exit(1);
-   }
-
 
 static void EG_minEqArc (ego face, int n, double *uvn, double *uvOUT) {
    int    nS = 20, stat, j, i, it, nIT = 100, flag =0, fold = 0, periodic;
    double delta[3] = {0.0, 0.0,0.0}, L[3] = {0.0, 0.0, 0.0}, range[4],
             pIT[18], J[9], JI[9], *pn = NULL, *opn = NULL, *l = NULL, lt, r[3], alpha,
+            dlu0, dlv0, dlui, dlvi, dluu0, dluv0, dlvv0, dluui, dlvvi, dluvi,
+            dlu2, dlv2,dluu2, dlvv2, dluv2,dlu3, dlv3,dluu3, dlvv3, dluv3,
             detJ, x1 = 0.0, x2 = 0.0, e1 = 0.0, e2 = 0.0, x0 = 0.0, uv[3], u[3], v[3], uvm[2],
             uvIT[3], nrm1, nrm2, s, rsdnrm = 0.0, x3 = 0.0, delnrm = 1.0, tol = 1.e-10;
+  double tu, tv, t, tuu, tuv, tvv;
+
 
      pn   = EG_alloc(3 * n * sizeof(double));
      opn  = EG_alloc(3 * n * sizeof(double));
      l    = EG_alloc(2 * n * sizeof(double));
-
-    if ( n == 4) {
-     pn[0] = 0.5 ; pn[1]  = 0.0; pn[2] = 0.0;
-     pn[3] = 1.0 ; pn[4]  = 0.5; pn[5] = 0.0;
-     pn[6] = 0.5 ; pn[7]  = 1.0; pn[8] = 0.0;
-     pn[9] = 0.0 ; pn[10]  = 0.5; pn[11] = 0.0;
-     EG_invEvaluate(face, pn   , uvn, J);
-     EG_invEvaluate(face,&pn[3], &uvn[2], J);
-     EG_invEvaluate(face,&pn[6], &uvn[4], J);
-     EG_invEvaluate(face,&pn[9], &uvn[6], J);
-   }
-     if (pn == NULL ) return;
-     uvIT[0] = uvIT[1] = uvIT[2] = 0.0;
+     /*if ( n == 4) {
+         pn[0] = 0.0 ; pn[1]  = 0.0; pn[2] = 0.0;
+         pn[3] = 1.0 ; pn[4]  = 0.0; pn[5] = 0.0;
+         pn[6] = 1.0 ; pn[7]  = 1.0; pn[8] = 0.0;
+         pn[9] = 0.0 ; pn[10] = 1.0; pn[11] = 0.0;
+         EG_invEvaluate(face, pn   , uvn, J);
+         EG_invEvaluate(face,&pn[3], &uvn[2], J);
+         EG_invEvaluate(face,&pn[6], &uvn[4], J);
+         EG_invEvaluate(face,&pn[9], &uvn[6], J);
+       }*/
+     if (pn == NULL || opn == NULL || l == NULL) return;
+     uvIT[0] = uvIT[1] = 0.0; uvIT[2] = -0.0;
      for (stat = j = i = 0 ; i < n; i++) {
        stat += EG_evaluate(face, &uvn[2 * i], pIT);
        if ( stat != EGADS_SUCCESS) {
@@ -2653,46 +2113,116 @@ static void EG_minEqArc (ego face, int n, double *uvn, double *uvOUT) {
        pn[3 * i    ] = pIT[0];
        pn[3 * i + 1] = pIT[1];
        pn[3 * i + 2] = pIT[2];
-       printf("P%d %lf %lf %lf\n", i, pIT[0], pIT[1], pIT[2]);
        nrm1          = DOT3(&pIT[3], &pIT[3]);
        nrm2          = DOT3(&pIT[6], &pIT[6]);
        if (nrm1 < 1.e-14 || nrm2 < 1.e-14 || i == 3) continue;
-
        uvIT[0] += uvn[2 * i]; uvIT[1] += uvn[2 * i + 1];
        j++;
     }
     uvIT[0] /= (double)j; uvIT[1] /= (double)j;
+    //uvIT[2] = 1.0;
+    //uv[2] = 1.0;
     for ( it = 0; it < nIT; it++) {
       s       = 1.0;
       for (j  = 0; j < nS; j++) {
         uv[0] = uvIT[0] - s*delta[0];
         uv[1] = uvIT[1] - s*delta[1];
         uv[2] = uvIT[2] - s*delta[2];
+        //uv[2] = 1.0;
+        printf(" UV %lf %lf %lf\n", uv[0], uv[1], uv[2]);
         stat  = EG_evaluate(face, uv, pIT);
         lt = 0.0;
       for (i = 0 ; i < n; i++) {
+        printf("%lf %lf %lf \n", pn[3 * i],pn[3 * i + 1],pn[3 * i + 2]);
+        printf("%lf %lf %lf \n\n\n", pIT[0], pIT[1], pIT[2]);
         VEC(&pn[3 * i], pIT, r);
         l[    i] = sqrt(DOT(r,r));
         l[n + i] = pow (DOT(r,r),1.5);
          lt     += l[i];
       }
-      L[0] = L[1] = L[2] = 0.0;
       u[0] = pIT[3] ;u[1] = pIT[4] ;u[2] = pIT[5] ;
       v[0] = pIT[6] ;v[1] = pIT[7] ;v[2] = pIT[8] ;
-      printf(" ------------- IT %d s %d ----------------\n", it, j);
-      for (i = 0 ; i < n; i++) {
-        printf(" L[%d]= %lf TOT %lf RATIO %lf\n", i + 1, l[i], lt, l[i] / lt);
+      tu   = tv  =   t = 0.0;
+      tuu  = tuv = tvv = 0.0;
+      for ( i = 0 ; i < n; i++) {
+        printf(" %lf %lf %lf - %lf %lf %lf\n", pIT[0], pIT[1], pIT[2], pn[3* i], pn[3 * i + 1], pn[3 * i + 2]);
         VEC(&pn[3 * i], pIT, r);
-        if (i == 0) alpha = 1.0 + (1.0 - (double)n) * uv[2];
-        else        alpha = 1.0 + uv[2];
-        nrm1  = DOT(u,r);
-        nrm2  = DOT(v,r);
-        L[0] += alpha * nrm1 / l[i];
-        L[1] += alpha * nrm2 / l[i];
-        if (i == 0) alpha = (1.0 - (double)n);
-        else        alpha =  1.0;
-        L[2] += alpha * l[i];
-       }
+        printf("R %lf %lf %lf u %lf %lf %lf v %lf %lf %lf \n", r[0], r[1], r[2], u[0], u[1], u[2], v[0], v[1], v[2]);
+
+        tu  += DOT(r,u) / l[i];
+        tv  += DOT(r,v) / l[i];
+        printf("\n tu %lf DOT %lf L %lf --> du %lf\n", tu, DOT(r,u), l[i],  DOT(r,u) / l[i]);
+        printf("tv %lf DOT %lf L %lf --> du %lf\n", tv, DOT(r,v), l[i], DOT(r,v) / l[i] );
+
+        t   += l[i];
+        tuu += (DOT3(&pIT[9 ], r) + DOT(u,u)) / l[i] - DOT(u,r) * DOT(u,r) / l[n + i];
+        tuv += (DOT3(&pIT[12], r) + DOT(u,v)) / l[i] - DOT(u,r) * DOT(v,r) / l[n + i];
+        tvv += (DOT3(&pIT[15], r) + DOT(v,v)) / l[i] - DOT(v,r) * DOT(v,r) / l[n + i];
+      }
+      VEC(pn, pIT, r);
+      i = 0;
+      dlu0  = DOT(r, u) / l[i];
+      dlv0  = DOT(r, v) / l[i];
+      dluu0 = (DOT3(&pIT[9 ], r) + DOT(u,u)) / l[i] - DOT(u,r) * DOT(u,r) / l[n + i];
+      dluv0 = (DOT3(&pIT[12], r) + DOT(u,v)) / l[i] - DOT(u,r) * DOT(v,r) / l[n + i];
+      dlvv0 = (DOT3(&pIT[15], r) + DOT(v,v)) / l[i] - DOT(v,r) * DOT(v,r) / l[n + i];
+
+      i = 1;
+      VEC(&pn[3 * i], pIT, r);
+      dlui  = DOT(r, u) / l[i];
+      dlvi  = DOT(r, v) / l[i];
+      dluui = (DOT3(&pIT[9 ], r) + DOT(u,u)) / l[i] - DOT(u,r) * DOT(u,r) / l[n + i];
+      dluvi = (DOT3(&pIT[12], r) + DOT(u,v)) / l[i] - DOT(u,r) * DOT(v,r) / l[n + i];
+      dlvvi = (DOT3(&pIT[15], r) + DOT(v,v)) / l[i] - DOT(v,r) * DOT(v,r) / l[n + i];
+
+      i = 2;
+      VEC(&pn[3 * i], pIT, r);
+      dlu2  = DOT(r, u) / l[i];
+      dlv2  = DOT(r, v) / l[i];
+      dluu2 = (DOT3(&pIT[9 ], r) + DOT(u,u)) / l[i] - DOT(u,r) * DOT(u,r) / l[n + i];
+      dluv2 = (DOT3(&pIT[12], r) + DOT(u,v)) / l[i] - DOT(u,r) * DOT(v,r) / l[n + i];
+      dlvv2 = (DOT3(&pIT[15], r) + DOT(v,v)) / l[i] - DOT(v,r) * DOT(v,r) / l[n + i];
+
+      if ( n == 14) {
+        i = 3;
+        VEC(&pn[3 * i], pIT, r);
+        dlu3  = DOT(r, u) / l[i];
+        dlv3  = DOT(r, v) / l[i];
+        dluu3 = (DOT3(&pIT[9 ], r) + DOT(u,u)) / l[i] - DOT(u,r) * DOT(u,r) / l[n + i];
+        dluv3 = (DOT3(&pIT[12], r) + DOT(u,v)) / l[i] - DOT(u,r) * DOT(v,r) / l[n + i];
+        dlvv3 = (DOT3(&pIT[15], r) + DOT(v,v)) / l[i] - DOT(v,r) * DOT(v,r) / l[n + i];
+      }
+      printf("NEW IT %d  t %lf  tu %lf  tv %lf tuu %lf tuv %lf tvv %lf\n", it, t, tu, tv, tuu, tuv, tvv);
+      //uv[2] = 1.0;
+      //L[0]  = t * tu + uv[2] * (l[1] - l[0]) * (dlui - dlu0);
+      //L[0]  = t * tu + uv[2] * (dlui - dlu0);
+      //L[1]  = t * tv + uv[2] * (dlvi - dlv0);
+      L[0]  = tu + uv[2] * (dlui - dlu0);
+      L[1]  = tv + uv[2] * (dlvi - dlv0);
+      L[2]  = (l[1] -  l[0]);
+      if ( n == 4) {
+        L[0] += uv[2] * (dlu2 - dlu0);// + uv[2] * (dlu3 - dlu0);
+        L[1] += uv[2] * (dlv2 - dlv0);// + uv[2] * (dlv3 - dlv0);
+        L[2] += (l[2] - l[0]);// + (l[3] - l[0]);
+      }
+      /*L[0] = dlu0;
+      L[1] = dlv0; L[2] = 0.0;
+      //if ( it == 0)
+      printf(" ------------- IT %d s %d ----------------\n", it, j);
+      printf(" L[1]= %lf TOT %lf RATIO %lf IDEAL %lf\n",  l[0], lt, l[0] / lt, 1.0 / (double)n);
+      for (i = 1 ; i < n; i++) {
+        printf(" L[%d]= %lf TOT %lf RATIO %lf IDEAL %lf\n", i + 1, l[i], lt, l[i] / lt, 1.0 / (double)n);
+        VEC(&pn[3 * i], pIT, r);
+        dlui  = DOT(r,u) / l[i];
+        dlvi  = DOT(r,v) / l[i];
+        L[0] +=  dlui;
+        L[1] +=  dlvi;
+        if ( i == 1) {
+          L[0] +=  uv[2] * (l[i] - l[0]) * (dlui - dlu0);
+          L[1] +=  uv[2] * (l[i] - l[0]) * (dlvi - dlv0);
+          L[2] += 0.5 * (l[i] - l[0]) * (l[i] - l[0]);
+        }
+      }*/
        rsdnrm  = sqrt(DOT(L,L));
 #ifdef DEBUG2
        printf(" L %lf %lf %lf RSDNRM %1.2le < %1.2le ?\n", L[0], L[1], L[2], rsdnrm, x3);
@@ -2710,24 +2240,37 @@ static void EG_minEqArc (ego face, int n, double *uvn, double *uvOUT) {
      uvIT[0] = uv[0];
      uvIT[1] = uv[1];
      uvIT[2] = uv[2];
-     J[0] = J[1] = J[2] = 0.0;
-     J[4] = J[5] = J[8] = 0.0;
-     for (i = 0 ; i < n; i++) {
-       VEC(&pn[3 * i], pIT, r);
-       nrm1  = DOT(u,r);
-       nrm2  = DOT(v,r);
-       if (i == 0) alpha = 1.0 + (1.0 - (double)n) * uvIT[2];
-       else        alpha = 1.0 + uvIT[2];
-       J[0] += alpha * (DOT3(&pIT[9] , r) + DOT(u,u)) / l[i] - nrm1 * nrm1/ l[i + n];
-       J[1] += alpha * (DOT3(&pIT[12], r) + DOT(u,v)) / l[i] - nrm1 * nrm2/ l[i + n];
-       J[4] += alpha * (DOT3(&pIT[15], r) + DOT(v,v)) / l[i] - nrm2 * nrm2/ l[i + n];
-       if (i == 0) alpha =  1.0 - (double)n;
-       else        alpha =  1.0;
-       J[2] += alpha * nrm1 / l[i];
-       J[5] += alpha * nrm2 / l[i];
-      }
-      J[3] = J[1]; J[6] = J[2]; J[7] = J[5];
-       printf("\n JACOBIAN MATRIX \n");
+     /*VEC(pn, pIT, r);
+     printf("U %lf %lf %lf DV %lf %lf %lf \n\n", u[0], u[1], u[2], v[0], v[1], v[2]);
+     printf(" r %lf %lf %lf --> <u,r> %lf <v,r> %lf L2 %lf \n\n",
+              r[0], r[1], r[2], DOT(u,r), DOT(v,r), l[n]);
+     dluu0 = (DOT3(&pIT[9 ], r) + DOT(u,u)) / l[0] - DOT(u,r) * DOT(u,r) / l[n];
+     dluv0 = (DOT3(&pIT[12], r) + DOT(u,v)) / l[0] - DOT(u,r) * DOT(v,r) / l[n];
+     dlvv0 = (DOT3(&pIT[15], r) + DOT(v,v)) / l[0] - DOT(v,r) * DOT(v,r) / l[n];
+     J[0]  = dluu0; J[1] = dluv0; J[4] = dlvv0;*/
+     J[0]  = tuu;//tu * tu + t * tuu;
+     J[1]  = tuv;//tu * tv + t * tuv;
+     J[4]  = tvv;//tv * tv + t * tvv;
+
+     //J[0] += uv[2] * ( (dlui - dlu0) * (dlui - dlu0) + (l[1] - l[0]) * (dluui - dluu0) );
+     //J[1] += uv[2] * ( (dlvi - dlv0) * (dlui - dlu0) + (l[1] - l[0]) * (dluvi - dluv0) );
+     //J[4] += uv[2] * ( (dlvi - dlv0) * (dlvi - dlv0) + (l[1] - l[0]) * (dlvvi - dlvv0) );
+     J[0] += uv[2] * (dluui - dluu0);
+     J[1] += uv[2] * (dluvi - dluv0);
+     J[4] += uv[2] * (dlvvi - dlvv0);
+     //J[2]  = (l[1] - l[0]) * (dlui - dlu0);
+     //J[5]  = (l[1] - l[0]) * (dlvi - dlv0);
+     J[2]  = (dlui - dlu0);
+     J[5]  = (dlvi - dlv0);
+     if ( n == 4) {
+       J[0] += uv[2] * (dluu2 - dluu0);// + uv[2] * (dluu3 - dluu0);
+       J[1] += uv[2] * (dluv2 - dluv0);// + uv[2] * (dluv3 - dluv0);;
+       J[4] += uv[2] * (dlvv2 - dlvv0);// + uv[2] * (dlvv3 - dlvv0);;
+       J[2] += dlu2 - dlu0;// + dlu3 - dlu0;
+       J[5] += dlv2 - dlv0;// + dlv3 - dlu0;
+     }
+     J[3] = J[1]; J[6] = J[2]; J[7] = J[5];
+      printf("\n JACOBIAN MATRIX \n");
        printf("----------------------------\n");
        printf(" %lf  %lf  %lf  \n", J[0], J[1], J[2]);
        printf(" %lf  %lf  %lf  \n", J[3], J[4], J[5]);
@@ -2738,6 +2281,7 @@ static void EG_minEqArc (ego face, int n, double *uvn, double *uvOUT) {
        if (fabs(detJ) < 1.e-10) break;
        detJ = 1.0 / detJ;
 
+       //detJ = 1.0 / (J[0] * J[3] - J[1] * J[2]);
        JI[0] =  -J[7] * J[5];
        JI[1] =   J[7] * J[2];
        JI[2] =   J[1] * J[5] - J[4] * J[2];
@@ -2750,6 +2294,14 @@ static void EG_minEqArc (ego face, int n, double *uvn, double *uvOUT) {
        delta[0] = detJ * DOT3( JI   , L);
        delta[1] = detJ * DOT3(&JI[3], L);
        delta[2] = detJ * DOT3(&JI[6], L);
+
+       //delta[0] = detJ * ( J[3] * L[0] - J[1] * L[1]);
+       //delta[1] = detJ * (-J[2] * L[0] + J[0] * L[1]);
+       //x2   = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+       //delta[0] = detJ * (DOT3( JI   , L);
+       //delta[1] = detJ * DOT3(&JI[3], L);
+
+       printf(" DELTA %lf %lf %lf \n", delta[0], delta[1], delta[2]);
        x2       = sqrt(DOT(delta, delta));
 
        if      (it == 0) x0 = x2;
@@ -2762,235 +2314,38 @@ static void EG_minEqArc (ego face, int n, double *uvn, double *uvOUT) {
            printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
            if (e1 > tol && e2 > tol) printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
        }
-       uvIT[0] -= delta[0];
-       uvIT[1] -= delta[1];
-       uvIT[2] -= delta[2];
-       stat = EG_evaluate(face, uvIT, pIT);
        if (x2 < tol) break;
      }
      #ifdef DEBUG2
-     printf(" --------- GEO FINAL GUESS ----------- \n");
+     printf(" --------- FINAL MIN EQ ARC ----------- \n");
      printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
      if (e1 > tol && e2 > tol) printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
      for (i = 0 ; i < n; i++)
-       printf(" L[%d]= %lf TOT %lf RATIO %lf\n", i + 1, l[i], lt, l[i] / lt);
+       printf(" L[%d]= %lf TOT %lf RATIO %lf IDEAL %lf\n", i + 1, l[i], lt, l[i] / lt, 1.0 / (double)n);
      #endif
+     if (it > 20) fprintf(stderr,"MIN EQ ARC DIDN'T CONVERGE\n");
+     uvOUT[0] = uvIT[0];
+     uvOUT[1] = uvIT[1];
      if ( n == 4) exit(1);
    }
 
 
 
-static void EG_geo44 (ego face, double *uvn, double *uvOUT) {
+static void EG_totMinArc(meshMap *qm, vStar *star, double *uvOUT) {
+  double *uv = NULL;
+  int i;
 
-  int    nS = 20, stat, j, i, it, nIT = 100, flag =0, fold = 0, periodic;
-  double delta[2] = {0.0, 0.0}, L[2] = {0.0, 0.0}, range[4],
-         pIT[18], J[4], p0[3], p1[3], p2[3], p3[3], dp0[3], dp1[3], dp2[3], dp3[3], l02, l13,l0, l1, l2,l3,
-         detJ, x1 = 0.0, x2 = 0.0, e1 = 0.0, e2 = 0.0, x0 = 0.0, u[3], v[3], uvm[2],
-         du_p0 ,du_p1 ,du_p2, du_p3 , dv_p0 ,dv_p1 ,dv_p2 ,dv_p3,ll0, ll1, ll2, ll3,
-         sdu02, sdu13, sdv02, sdv13,
-         uvIT[2], nrm1, nrm2, s, rsdnrm = 0.0, x3 = 0.0, delnrm = 1.0, tol = 1.e-10;
-
-  j = 0; uvIT[0] = uvIT[1] = 0.0;
-  /*
-  p0[0] = 0.5 ; p0[1]  = 0.0; p0[2] = 0.0;
-  p1[0] = 1.0 ; p1[1]  = 0.5; p1[2] = 0.0;
-  p2[0] = 0.5 ; p2[1]  = 1.0; p2[2] = 0.0;
-  p3[0] = 0.0 ; p3[1]  = 0.5; p3[2] = 0.0;
-  EG_invEvaluate(face,p0, uvn, J);
-  EG_invEvaluate(face,p1, &uvn[2], J);
-  EG_invEvaluate(face,p2, &uvn[4], J);
-  EG_invEvaluate(face,p3, &uvn[6], J);
-  printf("%lf %lf %lf 0\n", p0[0], p0[1 ], p0[2]);
-  printf("%lf %lf %lf 1\n", p1[0], p1[1 ], p1[2]);
-  printf("%lf %lf %lf 2\n", p2[0], p2[1 ], p2[2]);
-  printf("%lf %lf %lf 3\n", p3[0], p3[1 ], p3[2]);
-  printf("%lf %lf %lf 4\n", p0[0], p0[1 ], p0[2]);*/
-  stat = EG_evaluate(face, uvn, pIT);
-  p0[0] = pIT[0]; p0[1] = pIT[1]; p0[2] = pIT[2];
-  if (DOT3(&pIT[3], &pIT[3]) > 1.e-09 &&
-      DOT3(&pIT[6], &pIT[6]) > 1.e-09 ) {
-        uvIT[0] += uvn[0]; uvIT[1] += uvn[1]; j++;
-      }
- stat = EG_evaluate(face, &uvn[2], pIT);
- p1[0] = pIT[0]; p1[1] = pIT[1]; p1[2] = pIT[2];
- if (DOT3(&pIT[3], &pIT[3]) > 1.e-09 &&
-     DOT3(&pIT[6], &pIT[6]) > 1.e-09 ) {
-       uvIT[0] += uvn[2]; uvIT[1] += uvn[3]; j++;
-     }
- stat = EG_evaluate(face,  &uvn[4], pIT);
- p2[0] = pIT[0]; p2[1] = pIT[1]; p2[2] = pIT[2];
- if (DOT3(&pIT[3], &pIT[3]) > 1.e-09 &&
-     DOT3(&pIT[6], &pIT[6]) > 1.e-09 ) {
-       uvIT[0] += uvn[4]; uvIT[1] += uvn[5]; j++;
-     }
- stat = EG_evaluate(face, &uvn[6], pIT);
- p3[0] = pIT[0]; p3[1] = pIT[1]; p3[2] = pIT[2];
- if (DOT3(&pIT[3], &pIT[3]) > 1.e-09 &&
-     DOT3(&pIT[6], &pIT[6]) > 1.e-09 ) {
-       uvIT[0] += uvn[6]; uvIT[1] += uvn[7]; j++;
- }
- uvIT[0] /= (double)j; uvIT[1] /= (double)j;
- uvIT[0] = 0.75 * uvIT[0] + uvn[0] * 0.25;
- uvIT[1] = 0.75 * uvIT[1] + uvn[1] * 0.25;
- stat = EG_evaluate(face, uvIT, pIT);
-
-
- EG_getSidepoint(face, 0.5, uvn, &uvn[4], NULL, NULL, uvm);
- EG_evaluate(face, uvm, pIT);
- VEC( p0, pIT, dp0);
- l02  = sqrt (DOT(dp0,dp0));
- VEC( p2 , pIT, dp0);
- l02 += sqrt (DOT(dp0,dp0));
-
- EG_getSidepoint(face, 0.5, &uvn[2], &uvn[6], NULL, NULL,  uvm);
- EG_evaluate(face, uvm, pIT);
- VEC( p1   , pIT, dp0);
- l13  = sqrt (DOT(dp0,dp0));
- VEC( p3   , pIT, dp0);
- l13 += sqrt (DOT(dp0,dp0));
-
- //uvIT[0] /= (double)j; uvIT[1] /= (double)j;
- //uvIT[0] = 0.75 * uvIT[0] + uvn[0] * 0.25;
- //uvIT[1] = 0.75 * uvIT[1] + uvn[1] * 0.25;
- stat = EG_evaluate(face, uvIT, pIT);
- for ( it = 0; it < nIT; it++) {
-   dp0[0] = pIT[0] - p0[0]; dp0[1] = pIT[1] - p0[1]; dp0[2] = pIT[2] - p0[2];
-   dp1[0] = pIT[0] - p1[0]; dp1[1] = pIT[1] - p1[1]; dp1[2] = pIT[2] - p1[2];
-   dp2[0] = pIT[0] - p2[0]; dp2[1] = pIT[1] - p2[1]; dp2[2] = pIT[2] - p2[2];
-   dp3[0] = pIT[0] - p3[0]; dp3[1] = pIT[1] - p3[1]; dp3[2] = pIT[2] - p3[2];
-
-   l0     = sqrt(DOT(dp0, dp0));
-   l1     = sqrt(DOT(dp1, dp1));
-   l2     = sqrt(DOT(dp2, dp2));
-   l3     = sqrt(DOT(dp3, dp3));
-
-   ll0    = pow(DOT(dp0, dp0), 1.5);
-   ll1    = pow(DOT(dp1, dp1), 1.5);
-   ll2    = pow(DOT(dp2, dp2), 1.5);
-   ll3    = pow(DOT(dp3, dp3), 1.5);
-
-   #ifdef DEBUG2
-     if (it == 0) printf(" --------- INITIAL GUESS ----------\n");
-    else         printf(" *_*_*_*_  IT = %d  *_*_*_*_*_*\n", it);
-    printf("l0 %1.2le  l2 %1.2le ---> %1.2le = %1.2le\n", l0, l2, l0 + l2, l02);
-    printf("l1 %1.2le  l3 %1.2le ---> %1.2le = %1.2le\n", l1, l3, l1 + l3, l13);
-    printf(" P0 %lf %lf %lf\n", p0[0], p0[1], p0[2]);
-    printf(" P0 %lf %lf %lf\n", p1[0], p1[1], p1[2]);
-    printf(" P0 %lf %lf %lf\n", p2[0], p2[1], p2[2]);
-    printf(" P0 %lf %lf %lf\n", p3[0], p3[1], p3[2]);
-    printf(" POINT %lf %lf %lf UV %lf %lf\n", pIT[0], pIT[1], pIT[2], uvIT[0], uvIT[1]);
-   #endif
-    u[0] = pIT[3]; u[1] = pIT[4]; u[2] = pIT[5];
-    v[0] = pIT[6]; v[1] = pIT[7]; v[2] = pIT[8];
-    // F
-    du_p0 = DOT(u, dp0); du_p1 = DOT(u, dp1);
-    du_p2 = DOT(u, dp2); du_p3 = DOT(u, dp3);
-
-    dv_p0 = DOT(v, dp0); dv_p1 = DOT(v, dp1);
-    dv_p2 = DOT(v, dp2); dv_p3 = DOT(v, dp3);
-
-    sdu02 = du_p0 / l0 + du_p2 / l2;
-    sdu13 = du_p1 / l1 + du_p3 / l3;
-    sdv02 = dv_p0 / l0 + dv_p2 / l2;
-    sdv13 = dv_p1 / l1 + dv_p3 / l3;
-
-    //L[0]  = (l0 + l2 - l02) * sdu02 + (l1 + l3 - l13) * sdu13;
-    //L[1]  = (l0 + l2 - l02) * sdv02 + (l1 + l3 - l13) * sdv13;
-    L[0]  = sdu02 + sdu13;
-    L[1]  = sdv02 + sdv13;
-
-    //J[0]  = sdu02 * sdu02 + sdu13 * sdu13;
-    //J[1]  = sdu02 * sdv02 + sdu13 * sdv13;
-    //J[3]  = sdv02 * sdv02 + sdv13 * sdv13;
-
-    //nrm1  = (DOT3(&pIT[9], dp0) + DOT(u,u)) / l0 - du_p0 * du_p0 / ll0;
-    //nrm2  = (DOT3(&pIT[9], dp2) + DOT(u,u)) / l2 - du_p2 * du_p2 / ll2;
-    //J[0] += (l0 + l2 - l02) * (nrm1 + nrm2);
-    J[0]  = (DOT3(&pIT[9], dp0) + DOT(u,u)) / l0 - du_p0 * du_p0 / ll0;
-    J[0] += (DOT3(&pIT[9], dp1) + DOT(u,u)) / l1 - du_p1 * du_p1 / ll1;
-    J[0] += (DOT3(&pIT[9], dp2) + DOT(u,u)) / l2 - du_p2 * du_p2 / ll2;
-    J[0] += (DOT3(&pIT[9], dp3) + DOT(u,u)) / l3 - du_p3 * du_p3 / ll3;
-
-    J[1]  = (DOT3(&pIT[12], dp0) + DOT(u,v)) / l0 - du_p0 * dv_p0 / ll0;
-    J[1] += (DOT3(&pIT[12], dp1) + DOT(u,v)) / l1 - du_p1 * dv_p1 / ll1;
-    J[1] += (DOT3(&pIT[12], dp2) + DOT(u,v)) / l2 - du_p2 * dv_p2 / ll2;
-    J[1] += (DOT3(&pIT[12], dp3) + DOT(u,v)) / l3 - du_p3 * dv_p3 / ll3;
-
-    J[3]  = (DOT3(&pIT[15], dp0) + DOT(v,v)) / l0 - dv_p0 * dv_p0 / ll0;
-    J[3] += (DOT3(&pIT[15], dp1) + DOT(v,v)) / l1 - dv_p1 * dv_p1 / ll1;
-    J[3] += (DOT3(&pIT[15], dp2) + DOT(v,v)) / l2 - dv_p2 * dv_p2 / ll2;
-    J[3] += (DOT3(&pIT[15], dp3) + DOT(v,v)) / l3 - dv_p3 * dv_p3 / ll3;
-
-    /*nrm1  = (DOT3(&pIT[12], dp0) + DOT(u,v)) / l0 - du_p0 * dv_p0 / ll0;
-    nrm2  = (DOT3(&pIT[12], dp2) + DOT(u,v)) / l2 - du_p2 * dv_p2 / ll2;
-    J[1] += (l0 + l2 - l02) * (nrm1 + nrm2);
-
-    nrm1  = (DOT3(&pIT[12], dp1) + DOT(u,v)) / l1 - du_p1 * dv_p1 / ll1;
-    nrm2  = (DOT3(&pIT[12], dp3) + DOT(u,v)) / l3 - du_p3 * dv_p3 / ll3;
-    J[1] += (l1 + l3 - l13) * (nrm1 + nrm2);
-
-    nrm1  = (DOT3(&pIT[15], dp0) + DOT(v,v)) / l0 - dv_p0 * dv_p0 / ll0;
-    nrm2  = (DOT3(&pIT[15], dp2) + DOT(v,v)) / l2 - dv_p2 * dv_p2 / ll2;
-    J[3] += (l0 + l2 - l02) * (nrm1 + nrm2);
-
-    nrm1  = (DOT3(&pIT[15], dp1) + DOT(v,v)) / l1 - dv_p1 * dv_p1 / ll1;
-    nrm2  = (DOT3(&pIT[15], dp3) + DOT(v,v)) / l3 - dv_p3 * dv_p3 / ll3;
-    J[3] += (l1 + l3 - l13) * (nrm1 + nrm2);*/
-
-    J[2]  = J[1];
-    x2       = sqrt (L[0] * L[0] + L[1] * L[1]);
-    printf(" L %1.2le  %1.2le size %1.2le\n", L[0], L[1], x2);
-    printf(" JACOBIAN\n %1.2le %1.2le \n %1.2le %1.2le\n",
-              J[0], J[1], J[2], J[3]);
-    detJ    = J[0] * J[3] - J[1] * J[2];
-    if ( fabs(detJ) < 1.e-12) {
-      printf(" DET TOO SMALL: %1.2le . BREAK\n", detJ);
-      break;
-    }
-    detJ     = 1.0 / detJ;
-    delta[0] = detJ * (  J[3] * L[0] - J[1] * L[1]);
-    delta[1] = detJ * ( -J[2] * L[0] + J[0] * L[1]);
-    x2       = sqrt (delta[0] * delta[0] + delta[1] * delta[1]);
-    if      (it == 0) x0 = x2;
-    else if (it == 1) x1 = x2;
-    else {
-        e1 = fabs(x1 / x0);
-        e2 = fabs(x2 / x1);
-        x0 = x1;
-        x1 = x2;
-        printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
-if (e1 > tol && e2 > tol) printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
-    }
-    uvIT[0] -= delta[0];
-    uvIT[1] -= delta[1];
-    stat = EG_evaluate(face, uvIT, pIT);
-    if (x2 < tol) break;
+  uv = EG_alloc(2 * (star ->nV -1) * sizeof (double));
+  if (uv == NULL) return;
+  for ( i = 1; i < star -> nV; i++)
+  {
+    uv[ 2 * (i - 1)     ] = qm -> uvs [ 2 * ( star ->verts[i] - 1)    ];
+    uv[ 2 * (i - 1) + 1 ] = qm -> uvs [ 2 * ( star ->verts[i] - 1) + 1];
   }
-  #ifdef DEBUG2
-  printf(" --------- GEO FINAL GUESS ----------- \n");
-  printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
-  if (e1 > tol && e2 > tol) printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
-  printf("l0 %1.2le  l2 %1.2le ---> %1.2le = %1.2le\n", l0, l2, l0 + l2, l02);
-  printf("l1 %1.2le  l3 %1.2le ---> %1.2le = %1.2le\n", l1, l3, l1 + l3, l13);
-  #endif
-  uvOUT[0] = uvIT[0];
-  uvOUT[1] = uvIT[1];
-  EG_minArc(face, 4, uvn, uvOUT);
-  //EG_geo4(face, uvn, uvOUT);
-  //exit(1);
-
-
-
-
+  printf(" CALL ARC FOR VERTEX %d \n", star->verts[0]);
+  EG_minEqArc (qm->face, star->nV - 1, uv, uvOUT);
+  EG_free(uv);
 }
-
-
-
-
-
-
-
-
 
 static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
   int q, v, j, i, k, *vl = NULL, ta[2], v1, v2, v3, corner, vla = 0,
@@ -3136,15 +2491,27 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
               if (q == 0) {
                 uv[2] = uv[0];
                 uv[3] = uv[1];
-                //if (qm->fin == 0 )//|| qm->star[v]->nQ != 4 )
-                EG_minEqArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                if (qm->star[v]->nQ == 3) EG_baryInsert(qm->face, t, t, t, uvs, &uvs[2], &uvs[4], &uv[2]);//EG_minArc3(qm->face, uvs, &uvs[2], &uvs[4], &uv[2]);
+                else if (ta[0] != QA0 || qm->star[v]->nQ >= 5) EG_minEqArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                //if (qm->fin == 0 || ta[0] != QA0) EG_totMinArc(qm, qm->star[v], &uvs[2]);
                 //EG_eqArea(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                else if (qm->star[v]->nQ == 4) {
+                  j  = qm->valence[qm->star[v]->verts[1] -1][1];
+                  j *= qm->valence[qm->star[v]->verts[3] -1][1];
+                  j *= qm->valence[qm->star[v]->verts[5] -1][1];
+                  j *= qm->valence[qm->star[v]->verts[7] -1][1];
+                  if (j == 4 * 4 * 4 * 4 && qm ->fin == 1) EG_minArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                  else EG_minEqArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                }
+                else EG_baryInsert(qm->face, t, t, t, uvs, &uvs[2], &uvs[4], &uv[2]);//EG_minArc3(qm->face, uvs, &uvs[2], &uvs[4], &uv[2]);
+                //else EG_minEqArc(qm->face, qm->star[v]->nV, uvs, &uv[2]);
+                //
                 //else {
                 //  if (qm->star[v]->nQ == 3 )EG_minArc3(qm->face,  uvs, &uvs[2], &uvs[4],&uv[2]);
                 //if (qm->star[v]->nQ == 3)  EG_baryInsert(qm->face, t, t, t, uvs, &uvs[2], &uvs[4], &uv[2]);
                 //else
-                 if (ta[0] == QA0 && qm->star[v]->nQ == 4) EG_minArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
-                else EG_centroid (qm, qm->star[v]->nQ, &qm->valence[v][3], &uv[2],1);
+                 //if (ta[0] == QA0 && qm->star[v]->nQ == 4) EG_minArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
+                //else EG_centroid (qm, qm->star[v]->nQ, &qm->valence[v][3], &uv[2],1);
               //}
                 /*
 
@@ -3172,12 +2539,15 @@ static int EG_placeVertex(meshMap *qm, int vID, int pass, int full) {
                    EG_minArc(qm->face, qm->star[v]->nQ, uvs, &uv[2]);
                 else if(qm->star[v]->nQ >= 5)
                    EG_eqArea(qm->face, qm->star[v]->nQ, uvs, &uv[2]);*/
+                  if (qm->fin == 1){
+                   uv[2] = 0.5 * uv[0] + 0.5 * uv[2];
+                   uv[3] = 0.5 * uv[1] + 0.5 * uv[3];}/*
                 if (la != -1 && ta[0] == QA0 && qm->bdAng[vla] > 3.9 &&
                        qm->degen[vla] == 0) {
                     if (qm->star[v]-> nQ != 4 || full != 2) continue;
                     uv[2] = 0.5 * uv[0] + 0.5 * uv[2];
                     uv[3] = 0.5 * uv[1] + 0.5 * uv[3];
-                  }
+                  }*/
               } else if (round == 0) {
                   if ((    qm->star[v]->nQ %2 == 0 && q > qm->star[v]->nQ / 2) ||
                       (q > qm->star[v]->nQ )) break;
@@ -3550,6 +2920,7 @@ int EG_createMeshMap(bodyQuad *bodydata)
       bodydata->qm[f]->totQ   = nquad;
       bodydata->qm[f]->vInv   = NULL;
       bodydata->qm[f]->regBd  = 1;
+      bodydata->qm[f]->fin    = 0;
       if( btess->tess2d[f].tfi == 1 || bodydata->qm[f]->fID == 0) {
           bodydata->qm[f]->xyzs    = NULL;
           bodydata->qm[f]->uvs     = NULL;
