@@ -1,0 +1,255 @@
+void EG_minDOT(ego face, int n, double *uvn, double *uvOUT) {
+
+  int     nS = 20, stat = 0, j, i, it, nT = 100, periodic, eq[4] = {0,0,0,0};
+  double  delta[4] = {0.0, 0.0, 0.0, 0.0}, L[4] = {0.0, 0.0, 0.0, 0.0},
+           uvIT[4] = {0.0, 0.0, 0.0, 0.0}, *pn = NULL, *size = NULL ;
+  double range[4], pIT[18], J[16], JI[16], wi[3], wj[3], dii, dij, djj,
+         duii, duij, dujj,dvii, dvij, dvjj, uv[4], duuii, duuij, duujj,
+        duvii, duvij, duvjj, dvvii, dvvij, dvvjj, st = 0.0, tu, tv,
+         x1 = 0.0, x2 = 0.0, e1 = 0.0, e2 = 0.0,  x0 = 0.0,  s,
+         rsdnrm = 0.0, rsdnrm0 = 0.0, tol = 1.e-10,aux;
+         double alpha;
+
+ #ifdef DEBUG2
+  printf(" EG_minDOT n %d \n", n);
+ #endif
+  pn   = EG_alloc(3 * (n + 1) * sizeof(double));
+  size = EG_alloc(      2 * n * sizeof(double));
+  if (pn == NULL || size == NULL) return;
+  uvIT[0] = uvIT[1] = uvIT[2] = uvIT[3] = 0.0;
+  for (j = stat = i = 0 ; i < n; i++) {
+      stat += EG_evaluate(face, &uvn[2* i], pIT);
+      if ( stat != EGADS_SUCCESS) {
+  #ifdef DEBUG
+     fprintf(stderr, "point data is wrong\n!");
+  #endif
+      }
+      pn[3 * i    ] = pIT[0]; pn[3 * i + 1] = pIT[1];
+      pn[3 * i + 2] = pIT[2];
+      tu            = DOT3(&pIT[3], &pIT[3]);
+      tv            = DOT3(&pIT[6], &pIT[6]);
+      if (tu < 1.e-14 || tv < 1.e-14) continue;
+      uvIT[0] += uvn[2 * i]; uvIT[1] += uvn[2 * i + 1];
+      j++;
+  }
+  pn[3 * n ] = pn[0]; pn[3 * n + 1] = pn[1];  pn[3 * n +2] = pn[2];
+  uvIT[0]  /= (double)j; uvIT[1] /= (double)j;
+  stat     = EG_evaluate(face, uvIT, pIT);
+  uvOUT[0]  = uvIT[0]; uvOUT[1] = uvIT[1];
+  if (stat != EGADS_SUCCESS) {
+#ifdef DEBUG2
+  printf("SOMETHING WENT PRETTY WRONG.. %d. Returning uv average\n",stat);
+#endif
+    return;
+  }
+  pn[n * 3] = pn[0]; pn[n * 3 + 1] = pn[1]; pn[n * 3 + 2] = pn[2];
+  EG_getRange(face, range, &periodic);
+  // set for multipliers
+  for (it   = 0; it < nT; it++) {
+    s       = 1.0;
+    for (j  = 0; j < nS; j++) {
+      uv[0] = uvIT[0] - s*delta[0];
+      uv[1] = uvIT[1] - s*delta[1];
+      uv[2] = uvIT[2] - s*delta[2];
+      uv[3] = uvIT[3] - s*delta[3];
+      stat  = EG_evaluate(face, uv, pIT);
+      if (stat != EGADS_SUCCESS ||
+          uv[0] < range[0] || uv[0] > range[1] ||
+          uv[1] < range[2] || uv[1] > range[3] ) {
+#ifdef DEBUG2
+             printf(" OUT OF RANGE %lf [%lf, %lf]  %lf [%lf, %lf]\n",
+                      uv[0], range[0], range[1], uv[1], range[2], range[3]);
+#endif
+           if (it == 0) {
+            pIT[0] = pIT[1] = pIT[2] = 0.0;
+               uv [0] = uvOUT[0]; uv[1] = uvOUT[1];
+               for (   i = 0 ; i < n; i++) {
+                 pIT[0] += pn[3 * i    ];
+                 pIT[1] += pn[3 * i + 1];
+                 pIT[2] += pn[3 * i + 2];
+               }
+               pIT[0]   /= (double)n; pIT[1] /= (double)n;
+               pIT[2]   /= (double)n;
+               stat      = EG_invEvaluateGuess(face, pIT, uv, J);
+               if (stat != EGADS_SUCCESS ||
+                  uv[0] < range[0] || uv[0] > range[1] ||
+                  uv[1] < range[2] || uv[1] > range[3]) {
+                    stat = EG_invEvaluate(face, pIT, uv, J);
+                    if (stat != EGADS_SUCCESS ||
+                        uv[0] < range[0] || uv[0] > range[1] ||
+                        uv[1] < range[2] || uv[1] > range[3]) {
+#ifdef DEBUG2
+                         printf(" EG_minArea: EG_invEvaluateGuess %d out-of-range!\n", stat);
+#endif
+                         /* we are hopelessly out of range... */
+                        return;
+                    }
+                    continue; /* try again */
+              } continue;
+            } else {
+               /* already tried better guess with inverse evaluate... */
+#ifdef DEBUG2
+               printf(" EG_minArea: Initial out-of-range!\n");
+#endif
+               s /= 2.0;
+               continue;
+            }
+      }
+      // UPDATE VECTOR DISTANCE
+      L[0] = 0.0; L[1] = 0.0; L[2] = 0.0; L[3] = 0.0;
+      st   = 0.0;
+      printf(" IT %d  P %lf %lf %lf u %lf v %lf  \n", it, pIT[0], pIT[1], pIT[2], uv[0], uv[1]);
+      tu = tv = st = 0.0;
+      L[0] = L[1] = 0.0;
+      alpha  = cos(2.0 * PI / (double)(n) );
+      alpha *= alpha;
+      //alpha  = 1.0;
+      printf(" ALPHA  %lf \n", alpha);
+      for (i = 0 ; i < n; i++) {
+        VEC(pIT, &pn[3  *  i     ], wi);
+        VEC(pIT, &pn[3  * (i + 1)], wj);
+        dii     = DOT(wi,wi); dij = DOT(wi,wj); djj = DOT(wj,wj);
+        size[i] = dij * dij - alpha * dii * djj;
+        st     += size[i];
+
+        duii    = -2.0 * DOT3(&pIT[3], wi);
+        dujj    = -2.0 * DOT3(&pIT[3], wj);
+        duij    = -      DOT3(&pIT[3], wi) - DOT3(&pIT[3], wj);
+
+        dvii    = -2.0 * DOT3(&pIT[6], wi);
+        dvjj    = -2.0 * DOT3(&pIT[6], wj);
+        dvij    = -      DOT3(&pIT[6], wi) - DOT3(&pIT[6], wj);
+
+        L[0] += 2.0 * dij * duij - alpha * (duii + dujj);
+        L[1] += 2.0 * dij * dvij - alpha * (dvii + dvjj);
+        //L[0]  += -DOT (wi, wj) * ( DOT3(&pIT[3], wi) + DOT3 (&pIT[3], wj) );
+        //L[1]  += -DOT (wi, wj) * ( DOT3(&pIT[6], wi) + DOT3 (&pIT[6], wj) );
+       }
+#ifdef DEBUG2
+      printf("%lf %lf %lf C\n", pIT[0], pIT[1], pIT[2]);
+           if (it == 0) {
+             printf(" --------- INITIAL GUESS ----------- \n");
+             for (i = 0 ; i <= n; i++) printf("%lf %lf %lf %d\n",
+             pn[3 * i], pn[3 * i + 1], pn[3 * i + 2], i + 1);
+           }
+           else         printf(" --------- IT %d ----------- \n", it);
+           for (i = 0 ; i < n; i++) printf("SIZE %lf )\n", size[i]);
+#endif
+     rsdnrm = sqrt (L[0]* L[0] + L[1] * L[1]);
+#ifdef DEBUG2
+      printf(" IT %d L %lf %lf %lf %lf SIZE %lf\n", it, L[0], L[1], L[2], L[3], rsdnrm);
+#endif
+    if (it == 0 || rsdnrm < rsdnrm0) {
+      rsdnrm0 = rsdnrm; /* save off the last resdual and exit */
+      break;
+    } else {
+      printf(" HALF STEP\n");
+      s /= 2.0; /* try again if the residual grew */
+      continue;
+    }
+  }
+  uvIT[0] = uv[0];
+  uvIT[1] = uv[1];
+  uvIT[2] = uv[2];
+  uvIT[3] = uv[3];
+  if (j   == nS) {
+    printf(" EG_minArea LINE SEARCH FAIL!!!\n");
+    break;  /* line search failed */
+  }
+  if (rsdnrm < tol) {
+#ifdef DEBUG2
+    printf(" CONVERGED %1.2le --> %1.2le\n", rsdnrm, tol);
+#endif
+    break;  /* converged! */
+  }
+  double tuu, tuv, tvv;
+  tuu   = tuv  = tvv  = 0.0;
+  J[0 ] = J[1] = J[3] = 0.0;
+  for (i = 0 ; i < n; i++) {
+      VEC(pIT, &pn[3  *  i     ], wi);
+      VEC(pIT, &pn[3  * (i + 1)], wj);
+      dii     = DOT(wi,wi); dij = DOT(wi,wj); djj = DOT(wj,wj);
+
+      duii    = -2.0 * DOT3(&pIT[3], wi);
+      dujj    = -2.0 * DOT3(&pIT[3], wj);
+      duij    = -      DOT3(&pIT[3], wi) - DOT3(&pIT[3], wj);
+
+      dvii    = -2.0 * DOT3(&pIT[6], wi);
+      dvjj    = -2.0 * DOT3(&pIT[6], wj);
+      dvij    = -      DOT3(&pIT[6], wi) - DOT3(&pIT[6], wj);
+
+      tu      = 2.0 * dij * duij - alpha * (duii * djj + dii * dujj);
+      tv      = 2.0 * dij * dvij - alpha * (dvii * djj + dii * dvjj);
+
+      // second order terms
+      duuii = 2.0 * DOT3(&pIT[3], &pIT[3]) - 2.0 * DOT3(& pIT[9], wi);
+      duuij = 2.0 * DOT3(&pIT[3], &pIT[3]) - DOT3(& pIT[9], wi) - DOT3(&pIT[9], wj);
+      duujj = 2.0 * DOT3(&pIT[3], &pIT[3]) - 2.0 * DOT3(& pIT[9], wj);
+
+      duvii = 2.0 * DOT3(&pIT[3], &pIT[6]) - 2.0 * DOT3(&pIT[12], wi);
+      duvij = 2.0 * DOT3(&pIT[3], &pIT[6]) - DOT3(&pIT[12], wi) - DOT3(&pIT[12], wj);
+      duvjj = 2.0 * DOT3(&pIT[3], &pIT[6]) - 2.0 * DOT3(&pIT[12], wj);
+
+      dvvii = 2.0 * DOT3(&pIT[6], &pIT[6]) - 2.0 * DOT3(&pIT[15], wi);
+      dvvij = 2.0 * DOT3(&pIT[6], &pIT[6]) - DOT3(&pIT[15], wi) - DOT3(&pIT[15], wj);
+      dvvjj = 2.0 * DOT3(&pIT[6], &pIT[6]) - 2.0 * DOT3(&pIT[15], wj);
+
+      J[0] += 2.0 * (duij  * duij + dij * duuij) - alpha * (duuii + duujj );
+      J[1] += 2.0 * (duij  * dvij + dij * duvij) - alpha * (duvii + duvjj );
+      J[3] += 2.0 * (dvij  * dvij + dij * dvvij) - alpha * (dvvii + dvvjj );
+
+      //J[0] += 2.0 * DOT3(&pIT[3], &pIT[3]) - DOT3(& pIT[9],  wi) - DOT3(&pIT[9], wj);
+      //J[1] += 2.0 * DOT3(&pIT[3], &pIT[6]) - DOT3(& pIT[12], wi) - DOT3(&pIT[12], wj);
+      //J[3] += 2.0 * DOT3(&pIT[6], &pIT[6]) - DOT3(& pIT[15], wi) - DOT3(&pIT[15], wj);
+
+   }
+   J[2] = J[1];
+   x2   = J[0] * J[3] - J[1] * J[2];
+   printf(" JACOBIAN MATRIX %lf %lf \n %lf %lf \n DET %lf %lf ", J[0], J[1], J[2], J[3], x2, 1.e-14);
+   if (fabs(x2) < 1.e-14) break;
+   delta[0] = (1.0 / x2)  * ( J[3] * L[0] - J[1] * L[1]);
+   delta[1] = (1.0 / x2)  * (-J[2] * L[0] + J[0] * L[1]);
+   x2       = sqrt(delta[0] * delta[0] + delta[1] * delta[1]);
+   if      (it == 0) x0 = x2;
+   else if (it == 1) x1 = x2;
+   else {
+     e1 = fabs(x1 / x0);
+     e2 = fabs(x2 / x1);
+     x0 = x1;
+     x1 = x2;
+  }
+//#ifdef DEBUG2
+  printf(" Xn = (%lf %lf %lf )\n", uvIT[0], uvIT[1], uvIT[2]);
+  printf(" L = %lf %lf %lf DELTA %lf %lf %lf SIZE  %1.8le < %1.8le\n",
+          L[0], L[1], L[2], delta[0], delta[1], delta[2], x2, tol);
+//#endif
+  if (x2 < tol) break;
+    /* update the solution */
+    /* check for convergence on the parameter update */
+  }
+  if (rsdnrm >= tol && x2 >= tol) {
+#ifdef DEBUG
+    printf(" EG_eqArea: not converged -- residual %1.2le delta %1.2le (%1.2le)\n",
+    rsdnrm, x2, tol);
+#endif
+  }
+#ifdef DEBUG2
+  printf("IT %d DELTA SIZE %1.2e < %1.2e \n", it, x2, tol);
+  if (e1 > tol && e2 > tol)
+    printf("CONVERGENCE RATE %lf \n", log(e2) / log(e1));
+  for (i = 0 ; i < n; i++)
+  printf("size %lf \n", size[i]);
+#endif
+  for (i = 0 ; i < n; i++) {
+    printf("%lf %lf %lf \n", pIT[0], pIT[1], pIT[2]);
+    printf("%lf %lf %lf \n\n\n", pn[3 * i], pn[3 * i + 1], pn[3 * i + 2]);
+  }
+  EG_free(pn  );
+  EG_free(size);
+  uvOUT[0] = uvIT[0];
+  uvOUT[1] = uvIT[1];
+
+
+}
+
+
