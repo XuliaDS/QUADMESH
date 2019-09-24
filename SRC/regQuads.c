@@ -5272,10 +5272,10 @@ int main (int argc, char *argv[])
   /* fill our structure a body at at time */
   for (iBody = 0; iBody < nbody; iBody++) {
       /* FORCE QUADS FOR DEBUG MODE: IF WANTED uncomment the 4 lines */
-    stat = EG_attributeAdd(bodies[iBody], ".qParams",
+    /*stat = EG_attributeAdd(bodies[iBody], ".qParams",
                            ATTRSTRING, 4, NULL, NULL, "off");
     if (stat != EGADS_SUCCESS)
-        printf(" Body %d: attributeAdd = %d\n", iBody, stat);
+        printf(" Body %d: attributeAdd = %d\n", iBody, stat);*/
       EG_getTopology(bodies[iBody], &geom, &oclass,
                      &mtype, NULL, &j, &dum, &senses);
       if (mtype == WIREBODY) {

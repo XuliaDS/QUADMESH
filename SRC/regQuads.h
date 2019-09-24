@@ -8,15 +8,26 @@
 // shifted erf = 0 at x = -1 and 1 at x = 1. min is better than max (eg angles) a < b
 // max is better than min (sizes) b < a
 
-#define CROSS(a,b,c)      c[0] = (a[1]*b[2]) - (a[2]*b[1]);\
-                          c[1] = (a[2]*b[0]) - (a[0]*b[2]);\
-                          c[2] = (a[0]*b[1]) - (a[1]*b[0])
+#define CROSS(a,b,c)      (c)[0] = ((a)[1]*(b)[2]) - ((a)[2]*(b)[1]);\
+                          (c)[1] = ((a)[2]*(b)[0]) - ((a)[0]*(b)[2]);\
+                          (c)[2] = ((a)[0]*(b)[1]) - ((a)[1]*(b)[0])
 
-#define DOT(a,b)          (a[0]*b[0] + a[1]*b[1] + a[2]*b[2])
-#define DOT4(a,b)         (a[0]*b[0] + a[1]*b[1] + a[2]*b[2] + a[3]*b[3])
+#define DOT(a,b)          ((a)[0]*(b)[0] + (a)[1]*(b)[1] + (a)[2]*(b)[2])
+
+#define DOT4(a,b)         ((a)[0]*(b)[0] + (a)[1]*(b)[1] + (a)[2]*(b)[2] + (a)[3]*(b)[3])
+
+#define VEC(a,b,c)        (c)[0] = (b)[0] - (a)[0];\
+                          (c)[1] = (b)[1] - (a)[1];\
+                          (c)[2] = (b)[2] - (a)[2];
+
+
 #define PI     3.1415926535897931159979635
 #define PIEPS  3.2
 #define qEPS   1.e-14
+
+#define eAREA 1
+#define eLENGTH 0
+#define eCENTRE 2
 
 #define EPS08  1.E-08
 #define ANGCUT 2.9  // ~ 170 DEG
@@ -44,7 +55,7 @@ typedef struct{
 
 
 typedef struct{
-  int  *verts, *quads, type; // -1 interior, 0 its vertices are linked to bounds, 1 links to bounds directly
+  int  *verts, *quads; // -1 interior, 0 its vertices are linked to bounds, 1 links to bounds directly
   int   nV, nQ; // nV = n + 1 =  origin(1) + peaks (n)
   int  *idxV, *idxQ, *area;
   double *angle, *ratio, size;
@@ -54,7 +65,7 @@ typedef struct{
 typedef struct {
   int      fID, oriQ, oriV, plotcount, totQ, totV, pp, fin,
            sizeV, sizeQ, *qIdx, *qAdj, **valence, *vInv,
-           *vType, *remQ, *remV, invsteps, regBd, *degen, bari;
+           *vType, *remQ, *remV, invsteps, regBd, *degen, bari, print;
   ego      face;
   double   range[4],  *xyzs, *uvs, minArea, maxArea, avArea, *bdAng;
   vStar **star;
