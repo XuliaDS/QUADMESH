@@ -1,0 +1,55 @@
+# spheres
+# written by John Dannenhoffer
+
+
+# Big sphere and cut two spheres from it 
+sphere          0.00      0.00       0.00      1.
+sphere          0.00      -1.00       0.00     0.7
+subtract
+sphere          0.00      1.00       0.00      0.7
+subtract
+
+dump sphereholesphere.egads
+end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+end

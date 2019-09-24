@@ -2056,16 +2056,17 @@ int EG_createMeshMap(bodyQuad *bodydata)
            }
         }
       }
-      nquad                   = (int) ntri/2;
-      bodydata->qm[f]->oriV   = len;
-      bodydata->qm[f]->oriQ   = nquad;
-      bodydata->qm[f]->sizeV  = 2 * len;
-      bodydata->qm[f]->sizeQ  = 2 * nquad;
-      bodydata->qm[f]->totV   = len;
-      bodydata->qm[f]->totQ   = nquad;
-      bodydata->qm[f]->vInv   = NULL;
-      bodydata->qm[f]->regBd  = 1;
-      bodydata->qm[f]->fin    = 0;
+      nquad                  = (int) ntri/2;
+      bodydata->qm[f]->oriV  = len;
+      bodydata->qm[f]->oriQ  = nquad;
+      bodydata->qm[f]->sizeV = 2 * len;
+      bodydata->qm[f]->sizeQ = 2 * nquad;
+      bodydata->qm[f]->totV  = len;
+      bodydata->qm[f]->totQ  = nquad;
+      bodydata->qm[f]->vInv  = NULL;
+      bodydata->qm[f]->regBd = 1;
+      bodydata->qm[f]->fin   = 0;
+      bodydata->qm[f]->print = 0;
       if( btess->tess2d[f].tfi == 1 || bodydata->qm[f]->fID == 0) {
           bodydata->qm[f]->xyzs    = NULL;
           bodydata->qm[f]->uvs     = NULL;
@@ -2330,7 +2331,7 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList, int full
       }
   }
   qm->print = 0;
-  if (fullReg == 1) qm->print = 1;
+  //if (fullReg == 1) qm->print = 1;
   for (it = 0 ; it <= itMax; it++) {
     if (it > 0) {
       if (it == 3 || it == 11) qm ->fin = fullReg;
@@ -4367,9 +4368,8 @@ static int EG_transferValences(meshMap *qm, int *qID, int try5533,
   for (q   = 0; q < 4; q++) {
       swap = 0;
       adj  = qm->qAdj[4 * (qID[0] - 1) + q];
-      if (adj == -1 || adj == qID[1] //||
-        //(qm->regBd == 1 bdq == -1 && EG_regBoundQuad(qm, adj)
-        ) {
+      if (adj == -1 || adj == qID[1] ) {/*||
+        (qm->regBd == 1 && bdq == -1      ) {*/
           if (*transfering == 0 && qv35 == 1 ) {
               EG_collapse(qm, qID[0], &(*activity), 1, 0);
               if (stat     != EGADS_SUCCESS || *activity > 0) {

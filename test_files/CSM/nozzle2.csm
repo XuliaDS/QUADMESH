@@ -1,7 +1,0 @@
-# nozzle2
-# written by John Dannenhoffer
-# has to run after nozzle1.csm
-
-import    nozzle.step
-
-end

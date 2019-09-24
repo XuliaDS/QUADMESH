@@ -16,7 +16,7 @@ extrude         0 2.0 0
 
 subtract 
 
-dump spherecut.egads
+dump sphereHoleBox.egads
 
 
 
