@@ -1,0 +1,9 @@
+---- TOTAL VERTICES 76 TOTAL QUADS 58 --------------
+ INTERIOR VERTICES
+ VALENCE 3 = 4 VERTICES
+ VALENCE 4 = 36 VERTICES
+ BOUNDARY VERTICES
+ VALENCE 2 = 36 VERTICES
+
+
+Mesh has 58 QUADS, 6 / 76 irregular vertices (7.89 % ) ============

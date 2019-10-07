@@ -25,9 +25,9 @@
 #define PIEPS  3.2
 #define qEPS   1.e-14
 
-#define eAREA 1
-#define eLENGTH 0
-#define eCENTRE 2
+#define eAREA 2
+#define eLENGTH 1
+#define eCENTRE 0
 
 #define EPS08  1.E-08
 #define ANGCUT 2.9  // ~ 170 DEG

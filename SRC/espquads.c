@@ -925,7 +925,7 @@ void EG_minLengthArea(ego face, int n, double *uvn, double *uvOUT,
            if (it == 0){
              printf(" --------- INITIAL GUESS ----------- \n");
              st0 = st;
-           } else         printf(" --------- IT %d ----------- \n", it);
+           } else         printf(" --------- IT %d -----  %d  ------ \n", it, j);
              for (i = 0 ; i <= n; i++) printf("%lf %lf %lf %d\n",
              pn[3 * i], pn[3 * i + 1], pn[3 * i + 2], i + 1);
              printf("\n\n");
@@ -961,7 +961,7 @@ void EG_minLengthArea(ego face, int n, double *uvn, double *uvOUT,
         }
         rsdnrm = sqrt (DOT4(L,L));
     }
-#ifdef DEBUG
+#ifdef DEBUG2
       printf(" IT %d L %lf %lf %lf %lf SIZE %lf\n", it, L[0], L[1], L[2], L[3], rsdnrm);
 #endif
     if (it == 0 || rsdnrm < rsdnrm0) {
@@ -1754,11 +1754,11 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
       uv[2] = uv[0];
       uv[3] = uv[1];
       repe  = 0;
-      if (ta[0] >= QA3) EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 2, 0, 0.5, 0.5, &repe);
       if (nt == 3) {
-        if (type == eAREA) EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 4, 0, 0.5, 0.5, &repe);
+        if (type == eAREA || ta[0] >= QA3) EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 4, 0, 0.5, 0.5, &repe);
         else               EG_centroid(qm, nt, &qm->valence[v][3], &uv[2], 0);
       }
+      else if (ta[0] >= QA3) EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 2, 0, 0.5, 0.5, &repe);
       else if (la != -1) {
         v1 = qm->star[v] -> verts[qm->star[v]->idxV[la]] - 1;
         j = 4;
@@ -1766,7 +1766,7 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
         if (type == eAREA) {
           v2 = qm->star[v] -> verts[qm->star[v]->idxV[la + j]] - 1;
           EG_getSidepoint(qm->face, 0.5, &qm->uvs[2 * v1], &qm->uvs[2 * v2], NULL, NULL, &uv[2]);
-        } else if (type == eLENGTH){
+        } else if (type == eLENGTH) {
           if (nt == 4) {
             j = (la - 1) / 2;
             EG_minLengthArea(qm->face, nt, uvs, &uv[2], eLENGTH, 3, j, 0.5, 0.5, &repe);
@@ -1783,18 +1783,19 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
       } else if (type == eCENTRE || qm -> fin == 2) {
         if (lb != -1) {
           j  = 4;
+          if (try == 1 && nt == 5)  j = 6;
           v1 = qm->star[v] -> verts[qm->star[v]->idxV[lb    ]] - 1;
           v2 = qm->star[v] -> verts[qm->star[v]->idxV[lb + j]] - 1;
           EG_getSidepoint(qm->face, 0.5, &qm->uvs[2 * v1], &qm->uvs[2 * v2], NULL, NULL, &uv[2]);
+          if (qm->fin == 2 && nt == 5) try++;
         } else EG_centroid(qm, nt, &qm->valence[v][3], &uv[2], 1);
       } else {
-          j = 2;
+          j  = 2;
           v2 = 0;
           if (nt == 4 && try != 1) {
             j = 3;
             if      (l3 >= 0) v2 = l3;
             else if (l5 >= 0) v2 = l5;
-            //else j = 4;
           }
           try++;
           EG_minLengthArea(qm->face, nt, uvs, &uv[2], type, j, v2,  0.5, 0.5, &repe);
@@ -1802,7 +1803,8 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
       updateVertex(qm, vID, &uv[2]);
     }
     if (qm->print == 1) {
-      snprintf(buffer, 100,"V_%d_%d_%d", qm->plotcount, vID, round);
+      if (try == 2) snprintf(buffer, 100,"V_%d_%d_%d", qm->plotcount, vID, try);
+      else snprintf(buffer, 100,"V_%d_%d_%d", qm->plotcount, vID, round);
       printf("Writing in %s\n ", buffer);
       fout = fopen(buffer,"w");
       if (fout != NULL ) {
@@ -1873,7 +1875,7 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
     }
 
         if (nt == 4 && round == 1 && try == 1 && type != eCENTRE) round--;
-    //  if (nt == 5 && round == 1 && try == 1 && type == eCENTRE) round--;
+        if (nt == 5 && round == 1 && try == 1 && type == eCENTRE) round--;
         k = 0;
         if (qm->print == 1) {
           printf(" VERTEX %d \n", vID);
@@ -1907,7 +1909,7 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
                   } else {
                     if (res[4 + j] < ptol) continue;
                     if (res[1 + j] * res[j] < res[4 + j + 1] * res[4 + j] ||
-                       (res[4 + j] > ptol && ta[0] == QA0)) k = 1;
+                       (res[4 + j] * res[4 + j + 1] > ptol && ta[0] == QA0)) k = 1;
                       }
                   }
               }
@@ -2332,6 +2334,9 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList, int full
   }
   qm->print = 0;
   //if (fullReg == 1) qm->print = 1;
+  #ifdef DEBUG2
+  qm->print = 1;
+  #endif
   for (it = 0 ; it <= itMax; it++) {
     if (it > 0) {
       if (it == 3 || it == 11) qm ->fin = fullReg;
@@ -5012,7 +5017,7 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
       return stat;
   }
   ITMAX     = 100;
-  for (it = 0; it < ITMAX; it++) { //deactivae regular bound:: bring it back during transfer
+  for (it = 0; it < ITMAX; it++) {
       totActivity = 0;
 #ifdef DEBUG
       printf("CHECKIIN IT %d / %d \n", it, ITMAX);
@@ -5041,6 +5046,38 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
       if (totActivity == 0 || iV <= 2) break;
 
   }
+  snprintf(buffer,100, "wvsBasic_%d.txt", qm->fID);
+  wvsData(qm, buffer);
+  for (it = 0; it < ITMAX; it++) {
+      totActivity = 0;
+#ifdef DEBUG
+      printf("CHECKIIN IT %d / %d \n", it, ITMAX);
+      gnuData(qm, NULL);
+#endif
+      for (k = q = 0; q < qm->totQ; q++) {
+          if (qm->qIdx[4 * q] == -2) continue; //can be a deleted quad
+          stat         = EG_cleanNeighborhood(qm, q + 1, 1, &activity);
+          if (stat    != EGADS_SUCCESS) {
+              printf(" In EG_cleanMesh: EG_CleanNeighborhood for quad %d -->%d!!\n ",
+                     q + 1, stat);
+              qm->fID = 0;
+              return stat;
+          }
+          totActivity += activity;
+                if ( it == -1 ) {
+      stat       = resizeQm(qm );
+      //printf(" TRANSFER VALENCES  IV %d vQ %d totV %d \n ", iV ,vQ, totV);
+      //snprintf(buffer,100, "r1_%d_%d.txt", qm->fID, q);
+      //gnuData(qm, buffer);
+      //snprintf(buffer,100, "wvsr1_%d_%d.txt", qm->fID,q);
+      //wvsData(qm, buffer);
+       }
+      }
+      meshCount(qm, &iV, &totV, &vQ);
+      if (totActivity == 0 || iV <= 2) break;
+  }
+  snprintf(buffer,100, "wvsComp_%d.txt", qm->fID);
+  wvsData(qm, buffer);
 #ifdef REPORT
   stat       = resizeQm(qm );
   printf(" TRANSFER VALENCES  IV %d vQ %d totV %d \n ", iV ,vQ, totV);
@@ -5516,10 +5553,10 @@ int main (int argc, char *argv[])
   /* fill our structure a body at at time */
   for (iBody = 0; iBody < nbody; iBody++) {
       /* FORCE QUADS FOR DEBUG MODE: IF WANTED uncomment the 4 lines */
-    /*stat = EG_attributeAdd(bodies[iBody], ".qParams",
+    stat = EG_attributeAdd(bodies[iBody], ".qParams",
                          ATTRSTRING, 4, NULL, NULL, "off");
     if (stat != EGADS_SUCCESS)
-        printf(" Body %d: attributeAdd = %d\n", iBody, stat);*/
+        printf(" Body %d: attributeAdd = %d\n", iBody, stat);
       EG_getTopology(bodies[iBody], &geom, &oclass,
                      &mtype, NULL, &j, &dum, &senses);
       if (mtype == WIREBODY) {
