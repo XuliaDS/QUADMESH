@@ -1720,7 +1720,7 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
      updateVertex(qm, vID, uv);
      return QA0;
  }
- qInfo = (int*   )EG_alloc(    qm->star[v]->nQ * sizeof(int));
+ qInfo = (int*   )EG_alloc(     qm->star[v]->nQ * sizeof(int));
  uvs   = (double*)EG_alloc(2 * (qm->star[v]->nQ  + qm->star[v]->nV -1) * sizeof(double));
  if (qInfo == NULL || uvs == NULL) return EGADS_MALLOC;
  l3 = -1; l5 = -1;
@@ -1742,7 +1742,7 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
      v1 = qm->star[v]->verts[qm->star[v]->idxV[i + 2]] - 1;
      if  (qm->vType[v1] > 0 && qm->bdAng[v1] > PIEPS) qInfo[j] = 1;
      v1 = qm->star[v]->verts[qm->star[v]->idxV[i + 3]] - 1;
-     if  (qm->vType[v1] > 0 && qm->bdAng[v1] > PIEPS) qInfo[j] = 1;
+     if  (qm->vType[v1] > 0 && qm->bdAng[v1] >1.1 *  PIEPS) qInfo[j] = 1;
      j++;
  }
  uv [0]  = qm->uvs[2 * v    ];
@@ -1751,14 +1751,14 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
  for (try = i0 = round = 0; round < 2; round++) {
    if (round > 0) {
      updateVertex(qm, vID, uv);
+     if (qm->print == 1) printf(" TYPE %d try %d round %d TA %d la %d   lb %d \n", type, try, round, ta[0], la, lb);
      uv[2] = uv[0];
      uv[3] = uv[1];
      repe  = 0;
      if (nt == 3) {
        if (type == eAREA || ta[0] >= QA3) EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 4, 0, 0.5, 0.5, &repe);
        else               EG_centroid(qm, nt, &qm->valence[v][3], &uv[2], 0);
-     }
-     else if (la != -1) {
+     } else if (la != -1) {
        v1 = qm->star[v] -> verts[qm->star[v]->idxV[la]] - 1;
        j = 4;
        if (nt >= 6) j = 6;
@@ -1781,17 +1781,18 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
        }
      }
      else if (ta[0] >= QA3 && type != eCENTRE)
-       EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 2, 0, 0.5, 0.5, &repe);
-     else if (type == eCENTRE || qm -> fin == 2) {
-       if (lb != -1) {
+        EG_minLengthArea(qm->face, nt, uvs, &uv[2], eAREA, 2, 0, 0.5, 0.5, &repe);
+     else if (type == eCENTRE)
+       EG_centroid(qm, nt, &qm->valence[v][3], &uv[2], 1);
+     else {
+       if (lb != -1 ) {
          j  = 4;
          if (try == 1 && nt == 5)  j = 6;
          v1 = qm->star[v] -> verts[qm->star[v]->idxV[lb    ]] - 1;
          v2 = qm->star[v] -> verts[qm->star[v]->idxV[lb + j]] - 1;
          EG_getSidepoint(qm->face, 0.5, &qm->uvs[2 * v1], &qm->uvs[2 * v2], NULL, NULL, &uv[2]);
          if (qm->fin == 2 && nt == 5) try++;
-       } else EG_centroid(qm, nt, &qm->valence[v][3], &uv[2], 1);
-     } else {
+       } else {
          j  = 2;
          v2 = 0;
          if (nt == 4 && try != 1) {
@@ -1802,6 +1803,7 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
          try++;
          EG_minLengthArea(qm->face, nt, uvs, &uv[2], type, j, v2,  0.5, 0.5, &repe);
        }
+     }
      updateVertex(qm, vID, &uv[2]);
    }
    if (qm->print == 1) {
@@ -1928,11 +1930,11 @@ static int EG_newCoords(meshMap *qm, int vID, int type) {
       }
       uv [0] = uv [2];
       uv [1] = uv [3];
-      res[0] = res[3];
-      res[1] = res[4];
-      res[2] = res[5];
+      res[0] = res[4];
+      res[1] = res[5];
+      res[2] = res[6];
+      res[3] = res[7];
       ta [0] = ta [1];
-      if (ta[0] != QA0) continue;
       if (qm->fin == 0 && ta[0] == QA0) break;
  }
  updateVertex(qm, vID, uv);
@@ -2256,7 +2258,7 @@ int EG_createMeshMap(bodyQuad *bodydata)
 
 static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList, int fullReg)
 {
- int    si, v, q, i, j, k, kv, it = 0, itMax, sum = 0, *qlist = NULL, kq = 0;
+ int     itt, si, v, q, i, j, k, kv, it = 0, itMax, sum = 0, *qlist = NULL, kq = 0;
  int     stat = EGADS_SUCCESS, *mv = NULL, *area = NULL;
  double *uvxyz = NULL;
  double pos[18], uv[2];
@@ -2342,11 +2344,13 @@ static int EG_makeValidMesh(meshMap *qm, int nP, /*@null@*/ int *pList, int full
  for (it = 0 ; it <= itMax; it++) {
    if (it > 0) {
      if (it == 3 || it == 11) qm ->fin = fullReg;
-     if (it == 9 || it == 1 ) qm -> fin = -1;
+     if (it == 9 || it == 1 ) qm ->fin = -1;
      if (fullReg == 0 && it > 2 ) qm ->fin = 0;
      if (qm->fin > 0 && it >= itMax -3) qm->fin = 2;
+     itt = it % 3;
+     if (fullReg == 1 && it >= itMax -2) itt = 0;
      for (sum = k = 0 ; k < kv; k++) {
-       area[k] = EG_newCoords(qm, mv[k] + 1, it % 3);
+       area[k] = EG_newCoords(qm, mv[k] + 1, itt);
        sum     = MAX(sum,area[k]);
 #ifdef DEBUG2
          if (area[k] >= QA1) printf("VERTEX %d has area %d\n", mv[k] + 1, area[k]);
@@ -5027,7 +5031,7 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
 #endif
      for (k = q = 0; q < qm->totQ; q++) {
          if (qm->qIdx[4 * q] == -2) continue; //can be a deleted quad
-         stat         = EG_cleanNeighborhood(qm, q + 1, 0, 0, &activity);
+         stat         = EG_cleanNeighborhood(qm, q + 1, 1, 0, &activity);
          if (stat    != EGADS_SUCCESS) {
              printf(" In EG_cleanMesh: EG_CleanNeighborhood for quad %d -->%d!!\n ",
                     q + 1, stat);
@@ -5047,7 +5051,6 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
      meshCount(qm, &iV, &totV, &vQ);
      if (totActivity == 0 || iV <= 2) break;
  }
-
  snprintf(buffer,100, "wvsBasic_%d.txt", qm->fID);
  wvsData(qm, buffer);
  printf("****************** BASIC %d collapses ******************\n", loopact);
@@ -5055,7 +5058,7 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
         vQ, iV, totV, (double) iV * 100.0 / (double) totV);
  printf(" Invalid steps  %d\t CPU time: %d mins and %f sec\n",
         qm->invsteps, min, secs);
-
+/*
  for (it = 0; it < ITMAX; it++) {
      totActivity = 0;
 #ifdef DEBUG
@@ -5085,7 +5088,7 @@ printf(" DEACTIVATING SMALL AREA: %lf  %lf ratio %lf\n", qm->minArea, qm->avArea
      if (totActivity == 0 || iV <= 2) break;
  }
  snprintf(buffer,100, "wvsComp_%d.txt", qm->fID);
- wvsData(qm, buffer);
+ wvsData(qm, buffer);*/
 #ifdef REPORT
  stat       = resizeQm(qm );
  printf(" TRANSFER VALENCES  IV %d vQ %d totV %d \n ", iV ,vQ, totV);
